@@ -7,6 +7,7 @@ execute: kl.core.Execute
 
 /* Import the file with the declaration of basic security policy aliases. */
 use nk.base._
+use nk.basic._
 
 /* Declaration of entities. */
 use EDL Einit
@@ -30,22 +31,65 @@ request src=traffic_light.ControlSystem dst=kl.core.Core {
     grant ()
 }
 
-
+/*
 request src=traffic_light.ControlSystem 
     dst=traffic_light.LightsGPIO 
     endpoint=lightsGpio.mode 
     method=FMode {
         grant()
 }
+*/
 
 /*
+ *  Политика запрета двух зелёных
+ */
+/* 
 request src=traffic_light.ControlSystem 
     dst=traffic_light.LightsGPIO 
     endpoint=lightsGpio.mode 
     method=FMode {
-        assert (message.value != 0x404)        
+    	
+        assert (message.value != 0x404)                 
 }
 */
+
+request src=traffic_light.ControlSystem 
+    dst=traffic_light.LightsGPIO 
+    endpoint=lightsGpio.mode 
+    method=FMode {
+    	
+        //assert (message.value != 0x404)     
+        
+        /**
+         *  Поскольку в PSL не реализованы побитовые операции, нужно пойти
+         * неочевидным путём. Если выполнять ДЗ буквально, то
+         * у нас запретными являются значения от 404 до 707
+         * а нет... есть же еще 0x8 "мигающий"
+         * нужно общее решение...
+         */   
+                 
+        deny ( 
+        	   ((message.value >=0x404) && (message.value <= 0x407)) ||
+        	   /* следующий даипазон можно запретить без "выкалывания"
+        	   так как value за рамками спецификации */
+       		   ((message.value >=0x40C) && (message.value <= 0x4FF)) ||	
+       		   ((message.value >=0x504) && (message.value <= 0x507)) ||	
+     		   ((message.value >=0x50C) && (message.value <= 0x5FF)) ||	
+     		   ((message.value >=0x604) && (message.value <= 0x607)) ||	
+     		   ((message.value >=0x60C) && (message.value <= 0x6FF)) ||	
+     		   ((message.value >=0x704) && (message.value <= 0x707)) ||	
+     		   ((message.value >=0x70C) && (message.value <= 0x7FF)) ||
+     		   ((message.value >=0xC04) && (message.value <= 0xC07)) ||
+     		   ((message.value >=0xC0C) && (message.value <= 0xCFF)) ||
+     		   ((message.value >=0xD04) && (message.value <= 0xD07)) ||
+     		   ((message.value >=0xD0C) && (message.value <= 0xDFF)) ||
+     		   ((message.value >=0xE04) && (message.value <= 0xE07)) ||
+     		   ((message.value >=0xE0C) && (message.value <= 0xEFF)) ||
+     		   ((message.value >=0xF04) && (message.value <= 0xF07)) ||
+     		   ((message.value >=0xF0C))
+        )
+        
+}
 
 request src=Einit {
     grant ()
