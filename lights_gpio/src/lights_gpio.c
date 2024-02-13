@@ -100,7 +100,7 @@ int main(void)
     traffic_light_LightsGPIO_entity entity;
     traffic_light_LightsGPIO_entity_init(&entity, &component);
 
-    fprintf(stderr, "Hello I'm LightsGPIO\n");
+    fprintf(stderr, "LightsGPIO started\n");
 
     /* Dispatch loop implementation. */
     do

@@ -33,7 +33,7 @@ int main(int argc, const char *argv[])
         traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Green // <-- try to forbid this via security policies
     };
 
-    fprintf(stderr, "Hello I'm ControlSystem\n");
+    fprintf(stderr, "ControlSystem started\n");
 
     /**
      * Get the LightsGPIO IPC handle of the connection named
