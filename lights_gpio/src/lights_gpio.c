@@ -23,6 +23,10 @@ typedef struct IModeImpl {
     rtl_uint32_t step;                   /* Extra parameters */
 } IModeImpl;
 
+
+/* Проще всего запомнить состояние сигналов так */
+static uint32_t lights_bitfield = 0;
+
 /* Mode method implementation. */
 static nk_err_t FMode_impl(struct traffic_light_IMode *self,
                           const struct traffic_light_IMode_FMode_req *req,
@@ -36,6 +40,9 @@ static nk_err_t FMode_impl(struct traffic_light_IMode *self,
      * one step and include into result argument that will be
      * sent to the control system in the lights gpio response.
      */
+
+    // Запомнить состояние 
+    lights_bitfield = (req->value)&0xF0F;
     res->result = req->value + impl->step;
     return NK_EOK;
 }
@@ -59,6 +66,25 @@ static struct traffic_light_IMode *CreateIModeImpl(rtl_uint32_t step)
     impl.step = step;
 
     return &impl.base;
+}
+
+/* функция оценки корректности установленного сигнала */
+#define LIGHTS_OK 42
+#define LIGHTS_FORBIDDEN 13
+#define LIGHTS_ALLOFF 99
+#define LIGHST_DOUBTFUL 63
+int check_lights(){
+    /* Если  два зелёных на пересечении - запрещенное */
+    if ((lights_bitfield&0x4)&&(lights_bitfield&0x400)) return LIGHTS_FORBIDDEN;
+
+    /* если вместе с зелёным горит чтото еще - сомнительное*/
+    if ((lights_bitfield&0x4)&&(lights_bitfield&0xC)) return LIGHST_DOUBTFUL;
+    if ((lights_bitfield&0x400)&&(lights_bitfield&0xC00)) return LIGHST_DOUBTFUL;
+
+    /* если всё выключено */
+    if (!(lights_bitfield&0xF0F)) return LIGHTS_ALLOFF;
+
+    return LIGHTS_OK;
 }
 
 /* Lights GPIO entry point. */
@@ -156,7 +182,7 @@ int main(void)
             fprintf(stderr, "nk_transport_reply error\n");
         }
 
-        d_req.code = 42;
+        d_req.code = check_lights();
         if ((rc = IDiagnostics_DMessage(&d_proxy.base,
                                 &d_req,
                                 NULL,
