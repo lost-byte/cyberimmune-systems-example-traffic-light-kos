@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#define NK_USE_UNQUALIFIED_NAMES
+
 /* Files required for transport initialization. */
 #include <coresrv/nk/transport-kos.h>
 #include <coresrv/sl/sl_api.h>
@@ -11,6 +13,8 @@
 #include <traffic_light/LightsGPIO.edl.h>
 
 #include <assert.h>
+
+static const char EntityName[] = "HW Layer";
 
 /* Type of interface implementing object. */
 typedef struct IModeImpl {
@@ -62,6 +66,8 @@ int main(void)
     NkKosTransport transport;
     ServiceId iid;
 
+    fprintf(stderr, "[%s] started\n", EntityName);
+
     /* Get lights gpio IPC handle of "lights_gpio_connection". */
     Handle handle = ServiceLocatorRegister("lights_gpio_connection", NULL, 0, &iid);
     assert(handle != INVALID_HANDLE);
@@ -100,7 +106,7 @@ int main(void)
     traffic_light_LightsGPIO_entity entity;
     traffic_light_LightsGPIO_entity_init(&entity, &component);
 
-    fprintf(stderr, "LightsGPIO started\n");
+    
 
     /* Dispatch loop implementation. */
     do

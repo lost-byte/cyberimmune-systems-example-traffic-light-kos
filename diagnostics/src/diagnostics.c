@@ -5,15 +5,18 @@
 #include <stdbool.h>
 
 /* Files required for transport initialization. */
-//#include <coresrv/nk/transport-kos.h>
-//#include <coresrv/sl/sl_api.h>
+#include <coresrv/nk/transport-kos.h>
+
+#define NK_USE_UNQUALIFIED_NAMES
 
 /* Description of the server interface used by the `client` entity. */
-//#include <echo/Ping.idl.h>
+#include <traffic_light/IDiagnostics.idl.h>
 
 #include <assert.h>
 
 #define EXAMPLE_VALUE_TO_SEND 777
+
+static const char EntityName[] = "Diagnostics";
 
 /* Client entity entry point. */
 int main(int argc, const char *argv[])
@@ -23,8 +26,9 @@ int main(int argc, const char *argv[])
     struct echo_Ping_proxy proxy;
     int i;
     */
+    fprintf(stderr, "[%s]] started\n", EntityName);
 
-    fprintf(stderr, "Diagnostics started\n");
+    
 
     while(true){};
 

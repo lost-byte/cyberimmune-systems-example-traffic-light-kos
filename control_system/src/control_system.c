@@ -3,11 +3,14 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+#define NK_USE_UNQALIFIED_NAMES
+
 /* Files required for transport initialization. */
 #include <coresrv/nk/transport-kos.h>
 #include <coresrv/sl/sl_api.h>
 
 /* Description of the lights gpio interface used by the `ControlSystem` entity. */
+#include <traffic_light/ControlSystem.edl.h>
 #include <traffic_light/IMode.idl.h>
 
 #include <assert.h>
@@ -15,12 +18,17 @@
 #define MODES_NUM 9
 
 
+static const char EntityName[] = "Control System";
+
 /* Control system entity entry point. */
 int main(int argc, const char *argv[])
 {
     NkKosTransport transport;
     struct traffic_light_IMode_proxy proxy;
     int i;
+
+    fprintf(stderr, "[%s]] started\n", EntityName);
+
     static const nk_uint32_t tl_modes[MODES_NUM] = {
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Red,
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction2Red,
@@ -32,8 +40,6 @@ int main(int argc, const char *argv[])
         traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction1Blink + traffic_light_IMode_Direction2Yellow + traffic_light_IMode_Direction2Blink,
         traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Green // <-- try to forbid this via security policies
     };
-
-    fprintf(stderr, "ControlSystem started\n");
 
     /**
      * Get the LightsGPIO IPC handle of the connection named
