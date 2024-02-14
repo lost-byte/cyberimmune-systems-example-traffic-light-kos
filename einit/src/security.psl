@@ -60,6 +60,11 @@ request src=traffic_light.LightsGPIO dst=kl.core.Core {
     grant ()
 }
 
+/* Без этого сущность не запустится! */
+request src=traffic_light.Diagnostics dst=kl.core.Core {
+    grant ()
+}
+
 
 /* Response messages allowed. */
 response {
