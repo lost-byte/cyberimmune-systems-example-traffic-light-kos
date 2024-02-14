@@ -2,6 +2,7 @@
     "sonarlint.pathToCompileCommands": "${workspaceFolder}/build/compile_commands.json",
     "files.associations": {
         "stdlib.h": "c",
-        "diagnostics.edl.h": "c"
+        "diagnostics.edl.h": "c",
+        "stdio.h": "c"
     }
 }

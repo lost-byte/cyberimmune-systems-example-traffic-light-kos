@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <rtl/string.h>
 
 #define NK_USE_UNQUALIFIED_NAMES
 
@@ -69,22 +70,56 @@ static struct traffic_light_IMode *CreateIModeImpl(rtl_uint32_t step)
 }
 
 /* функция оценки корректности установленного сигнала */
+struct check_lights_result{
+    uint32_t code;
+    char msg[256];
+};
+
 #define LIGHTS_OK 42
 #define LIGHTS_FORBIDDEN 13
 #define LIGHTS_ALLOFF 99
 #define LIGHST_DOUBTFUL 63
-int check_lights(){
+struct check_lights_result check_lights(){
+
+    struct check_lights_result clr = {.code = LIGHTS_OK};
+    //memset(clr.msg, 0, 256);
+    strncpy(clr.msg,"all ok",256);
+
     /* Если  два зелёных на пересечении - запрещенное */
-    if ((lights_bitfield&0x4)&&(lights_bitfield&0x400)) return LIGHTS_FORBIDDEN;
+    if ((lights_bitfield&0x404) == 0x404){
+        clr.code = LIGHTS_FORBIDDEN;
+        strncpy(clr.msg,"forbidden state",256);
+        return clr;
+    }
+     
 
     /* если вместе с зелёным горит чтото еще - сомнительное*/
-    if ((lights_bitfield&0x4)&&(lights_bitfield&0xC)) return LIGHST_DOUBTFUL;
-    if ((lights_bitfield&0x400)&&(lights_bitfield&0xC00)) return LIGHST_DOUBTFUL;
+    if ((lights_bitfield&0x4)&&(lights_bitfield&0xB)){
+        clr.code = LIGHST_DOUBTFUL;
+        strncpy(clr.msg,"seems doubtful state",256);
+        return clr;
+    }
+    if ((lights_bitfield&0x400)&&(lights_bitfield&0xB00)){
+        clr.code = LIGHST_DOUBTFUL;
+        strncpy(clr.msg,"seems doubtful state",256);
+        return clr;
+    } 
 
     /* если всё выключено */
-    if (!(lights_bitfield&0xF0F)) return LIGHTS_ALLOFF;
+    if (!(lights_bitfield&0xF0F)){
+        clr.code = LIGHTS_ALLOFF;  
+        strncpy(clr.msg,"lights all off",256);
+        return clr;
+    }
 
-    return LIGHTS_OK;
+    /* нерегулируемый */
+    if (lights_bitfield == 0x808){
+        clr.code = LIGHTS_ALLOFF;  
+        strncpy(clr.msg,"blinking yellow",256);
+        return clr;
+    }
+
+    return clr;
 }
 
 /* Lights GPIO entry point. */
@@ -153,6 +188,10 @@ int main(void)
     IDiagnostics_DMessage_req d_req;
     IDiagnostics_DMessage_res d_res;
 
+    char reqBuffer[IDiagnostics_DMessage_req_arena_size];
+    struct nk_arena d_arena = NK_ARENA_INITIALIZER(
+                                reqBuffer, reqBuffer + sizeof(reqBuffer));
+
     /* Dispatch loop implementation. */
     do
     {
@@ -182,10 +221,31 @@ int main(void)
             fprintf(stderr, "nk_transport_reply error\n");
         }
 
-        d_req.code = check_lights();
+        struct check_lights_result clr = check_lights();
+        d_req.code = clr.code;
+        
+        nk_req_reset(&d_req);
+        nk_arena_reset(&d_arena);
+
+        rtl_size_t msg_len = rtl_strlen(clr.msg)+1;
+        nk_char_t *str = nk_arena_alloc(
+                        nk_char_t,
+                        &d_arena,
+                        &d_req.msg,
+                        msg_len);
+        if (str == RTL_NULL)
+        {
+            fprintf(
+                stderr,
+                "[%s]: Error: can`t allocate memory in arena!\n",
+                EntityName);
+        }
+
+        rtl_strncpy(str, clr.msg, (rtl_size_t) msg_len);
+
         if ((rc = IDiagnostics_DMessage(&d_proxy.base,
                                 &d_req,
-                                NULL,
+                                &d_arena,
                                 &d_res,
                                 NULL)
         ) != NK_EOK){

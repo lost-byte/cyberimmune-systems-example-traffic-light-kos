@@ -4,7 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#define NK_USE_UNQALIFIED_NAMES
+#define NK_USE_UNQUALIFIED_NAMES
 
 /* Files required for transport initialization. */
 #include <coresrv/nk/transport-kos.h>
@@ -16,7 +16,7 @@
 
 #include <assert.h>
 
-#define MODES_NUM 9
+#define MODES_NUM 13
 
 
 static const char EntityName[] = "Control System";
@@ -39,7 +39,11 @@ int main(int argc, const char *argv[])
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Green,
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Yellow,
         traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction1Blink + traffic_light_IMode_Direction2Yellow + traffic_light_IMode_Direction2Blink,
-        traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Green // <-- try to forbid this via security policies
+        traffic_light_IMode_Direction2Green + traffic_light_IMode_Direction2Yellow,
+        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction1Green,
+        traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Green, // <-- try to forbid this via security policies
+        IMode_Direction1Blink + IMode_Direction2Blink,
+        0
     };
 
     /**

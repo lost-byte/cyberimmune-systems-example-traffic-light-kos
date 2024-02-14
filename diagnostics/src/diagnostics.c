@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -31,7 +30,11 @@ static nk_err_t Dmesage(struct traffic_light_IDiagnostics *self,
     
     uint32_t code=req->code;
 
-    fprintf(stderr, "[%s]: Dmesage got code=%u\n", EntityName, code);
+    nk_uint32_t msg_len = 0;    
+    nk_ptr_t *msg = nk_arena_get(
+                            nk_char_t, req_arena, &(req->msg), &msg_len);
+
+    fprintf(stderr, "[%s]: Code[%u], Message:\"%s\"\n", EntityName, code, msg);
 
     return NK_EOK;
 }
