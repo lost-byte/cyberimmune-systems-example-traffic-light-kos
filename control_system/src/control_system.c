@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #define NK_USE_UNQALIFIED_NAMES
 
@@ -27,7 +28,7 @@ int main(int argc, const char *argv[])
     struct traffic_light_IMode_proxy proxy;
     int i;
 
-    fprintf(stderr, "[%s]] started\n", EntityName);
+    fprintf(stderr, "[%s] started\n", EntityName);
 
     static const nk_uint32_t tl_modes[MODES_NUM] = {
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Red,
@@ -71,6 +72,9 @@ int main(int argc, const char *argv[])
     traffic_light_IMode_FMode_res res;
 
     /* Test loop. */
+
+    //while(true){};
+
     req.value = 0;
     for (i = 0; i < MODES_NUM; i++)
     {
@@ -99,6 +103,6 @@ int main(int argc, const char *argv[])
         else
             fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
     }
-
+    
     return EXIT_SUCCESS;
 }

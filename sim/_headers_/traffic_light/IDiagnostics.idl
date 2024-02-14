@@ -1,8 +1,0 @@
-/* Package with an "IMode" interface declaration. */
-
-package traffic_light.IDiagnostics
-
-interface {
-    /* IMode interface method */
-    DMessage(in UInt32 code);
-}

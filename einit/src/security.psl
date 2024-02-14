@@ -39,6 +39,14 @@ request src=traffic_light.ControlSystem
         grant()
 }
 
+request src=traffic_light.LightsGPIO 
+    dst=traffic_light.Diagnostics 
+    endpoint=diagnostics.dmessage 
+    method=DMessage {
+        grant()
+}
+
+
 /*
 request src=traffic_light.ControlSystem 
     dst=traffic_light.LightsGPIO 
@@ -60,6 +68,9 @@ request src=traffic_light.LightsGPIO dst=kl.core.Core {
     grant ()
 }
 
+request src=traffic_light.Diagnostics dst=kl.core.Core {
+    grant ()
+}
 
 /* Response messages allowed. */
 response {

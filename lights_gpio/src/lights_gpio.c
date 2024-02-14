@@ -11,10 +11,11 @@
 
 /* EDL description of the LightsGPIO entity. */
 #include <traffic_light/LightsGPIO.edl.h>
+#include <traffic_light/IDiagnostics.idl.h>
 
 #include <assert.h>
 
-static const char EntityName[] = "HW Layer";
+static const char EntityName[] = "LightsGPIO";
 
 /* Type of interface implementing object. */
 typedef struct IModeImpl {
@@ -63,6 +64,7 @@ static struct traffic_light_IMode *CreateIModeImpl(rtl_uint32_t step)
 /* Lights GPIO entry point. */
 int main(void)
 {
+    nk_err_t rc;
     NkKosTransport transport;
     ServiceId iid;
 
@@ -106,7 +108,24 @@ int main(void)
     traffic_light_LightsGPIO_entity entity;
     traffic_light_LightsGPIO_entity_init(&entity, &component);
 
-    
+    /* Так, а тепер подключение к Diagnostics */
+    struct IDiagnostics_proxy d_proxy;
+    Handle d_handle = ServiceLocatorConnect("diagnostics_connection");
+    assert(d_handle != INVALID_HANDLE);
+
+    NkKosTransport d_transport;  // Нужен новый?
+    NkKosTransport_Init(&d_transport, d_handle, NK_NULL, 0);
+
+    /* получить идентификатор интерфейса */
+    nk_iid_t riid = ServiceLocatorGetRiid(d_handle, "diagnostics.dmessage");
+    assert(riid != INVALID_RIID);
+
+    /* Сделапть proxy - объект */
+    IDiagnostics_proxy_init(&d_proxy, &d_transport.base, riid);
+
+    /* определить структуры запроса и ответа */
+    IDiagnostics_DMessage_req d_req;
+    IDiagnostics_DMessage_res d_res;
 
     /* Dispatch loop implementation. */
     do
@@ -135,6 +154,16 @@ int main(void)
                                &res.base_,
                                &res_arena) != NK_EOK) {
             fprintf(stderr, "nk_transport_reply error\n");
+        }
+
+        d_req.code = 42;
+        if ((rc = IDiagnostics_DMessage(&d_proxy.base,
+                                &d_req,
+                                NULL,
+                                &d_res,
+                                NULL)
+        ) != NK_EOK){
+            fprintf(stderr, "[%s] IDiagnostics_DMessage error %d\n", EntityName, rc);
         }
     }
     while (true);
