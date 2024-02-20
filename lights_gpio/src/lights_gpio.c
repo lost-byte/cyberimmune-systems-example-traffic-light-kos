@@ -126,17 +126,72 @@ struct check_lights_result check_lights(){
 /* вынесем код обслуги IPC в отдельные функции */
 /* Дескриптор соединения lights_gpio_connection */
 typedef struct {
-    //struct IMode_proxy *proxy;
-    //IMode_FMode_req *req;
-    //IMode_FMode_res *res;
+    NkKosTransport transport;
+    ServiceId iid;
+    Handle handle;
+    LightsGPIO_entity_req req;
+    char req_buffer[LightsGPIO_entity_req_arena_size];
+    struct nk_arena req_arena;
+    LightsGPIO_entity_res res;
+    char res_buffer[LightsGPIO_entity_res_arena_size];
+    struct nk_arena res_arena;
+    CMode_component component;
+    LightsGPIO_entity entity;
 } CMode_TransportDescriptor;
 
-CMode_TransportDescriptor lights_gpio_connection_init(){
+void lights_gpio_connection_init(CMode_TransportDescriptor *CMode_td){
 
+    /* Get lights gpio IPC handle of "lights_gpio_connection". */
+    CMode_td->handle = ServiceLocatorRegister("lights_gpio_connection", NULL, 0, &CMode_td->iid);
+    assert(CMode_td->handle != INVALID_HANDLE);
+
+    /* Initialize transport to control system. */
+    NkKosTransport_Init(&CMode_td->transport, CMode_td->handle, NK_NULL, 0);
+
+    // Структуры запрос/ответ
+    struct nk_arena req_arena = NK_ARENA_INITIALIZER(CMode_td->req_buffer,
+                                        CMode_td->req_buffer + sizeof(CMode_td->req_buffer));
+
+    
+    struct nk_arena res_arena = NK_ARENA_INITIALIZER(CMode_td->res_buffer,
+                                        CMode_td->res_buffer + sizeof(CMode_td->res_buffer));
+
+    CMode_td->req_arena = req_arena;
+    CMode_td->res_arena = res_arena;
+
+    // диспетчер компонент
+    CMode_component_init(&CMode_td->component, CreateIModeImpl(0x1000000));
+
+    /* Initialize lights gpio entity dispatcher. */
+    LightsGPIO_entity_init(&CMode_td->entity, &CMode_td->component);
 }
 
-void lights_gpio_connection_loop(){
+void lights_gpio_connection_loop(CMode_TransportDescriptor *CMode_td){
+    /* Flush request/response buffers. */
+    nk_req_reset(&CMode_td->req);
+    nk_arena_reset(&CMode_td->req_arena);
+    nk_arena_reset(&CMode_td->res_arena);
 
+    /* Wait for request to lights gpio entity. */
+    if (nk_transport_recv(&CMode_td->transport.base,
+                            &CMode_td->req.base_,
+                            &CMode_td->req_arena) != NK_EOK) {
+        fprintf(stderr, "nk_transport_recv error\n");
+    } else {
+        /**
+         * Handle received request by calling implementation Mode_impl
+         * of the requested Mode interface method.
+         */
+        LightsGPIO_entity_dispatch(&CMode_td->entity, &CMode_td->req.base_, &CMode_td->req_arena,
+                                    &CMode_td->res.base_, &CMode_td->res_arena);
+    }
+
+    /* Send response. */
+    if (nk_transport_reply(&CMode_td->transport.base,
+                            &CMode_td->res.base_,
+                            &CMode_td->res_arena) != NK_EOK) {
+        fprintf(stderr, "nk_transport_reply error\n");
+    }
 }
 
 
@@ -144,48 +199,13 @@ void lights_gpio_connection_loop(){
 int main(void)
 {
     nk_err_t rc;
-    NkKosTransport transport;
-    ServiceId iid;
-
     fprintf(stderr, "[%s] started\n", EntityName);
 
-    /* Get lights gpio IPC handle of "lights_gpio_connection". */
-    Handle handle = ServiceLocatorRegister("lights_gpio_connection", NULL, 0, &iid);
-    assert(handle != INVALID_HANDLE);
+    /* Заинитить кишки своего API */
+    CMode_TransportDescriptor cs_td;
+    lights_gpio_connection_init(&cs_td);
 
-    /* Initialize transport to control system. */
-    NkKosTransport_Init(&transport, handle, NK_NULL, 0);
-
-    /**
-     * Prepare the structures of the request to the lights gpio entity: constant
-     * part and arena. Because none of the methods of the lights gpio entity has
-     * sequence type arguments, only constant parts of the
-     * request and response are used. Arenas are effectively unused. However,
-     * valid arenas of the request and response must be passed to
-     * lights gpio transport methods (nk_transport_recv, nk_transport_reply) and
-     * to the lights gpio method.
-     */
-    LightsGPIO_entity_req req;
-    char req_buffer[LightsGPIO_entity_req_arena_size];
-    struct nk_arena req_arena = NK_ARENA_INITIALIZER(req_buffer,
-                                        req_buffer + sizeof(req_buffer));
-
-    /* Prepare response structures: constant part and arena. */
-    LightsGPIO_entity_res res;
-    char res_buffer[LightsGPIO_entity_res_arena_size];
-    struct nk_arena res_arena = NK_ARENA_INITIALIZER(res_buffer,
-                                        res_buffer + sizeof(res_buffer));
-
-    /**
-     * Initialize mode component dispatcher. 3 is the value of the step,
-     * which is the number by which the input value is increased.
-     */
-    CMode_component component;
-    CMode_component_init(&component, CreateIModeImpl(0x1000000));
-
-    /* Initialize lights gpio entity dispatcher. */
-    LightsGPIO_entity entity;
-    LightsGPIO_entity_init(&entity, &component);
+    fprintf(stderr, "[%s] API transport inited\n", EntityName);
 
     /* Так, а теперь подключение к Diagnostics */
     struct IDiagnostics_proxy d_proxy;
@@ -213,31 +233,8 @@ int main(void)
     /* Dispatch loop implementation. */
     do
     {
-        /* Flush request/response buffers. */
-        nk_req_reset(&req);
-        nk_arena_reset(&req_arena);
-        nk_arena_reset(&res_arena);
-
-        /* Wait for request to lights gpio entity. */
-        if (nk_transport_recv(&transport.base,
-                              &req.base_,
-                              &req_arena) != NK_EOK) {
-            fprintf(stderr, "nk_transport_recv error\n");
-        } else {
-            /**
-             * Handle received request by calling implementation Mode_impl
-             * of the requested Mode interface method.
-             */
-            traffic_light_LightsGPIO_entity_dispatch(&entity, &req.base_, &req_arena,
-                                        &res.base_, &res_arena);
-        }
-
-        /* Send response. */
-        if (nk_transport_reply(&transport.base,
-                               &res.base_,
-                               &res_arena) != NK_EOK) {
-            fprintf(stderr, "nk_transport_reply error\n");
-        }
+        /* прокручивать диспетчинг своего API */
+        lights_gpio_connection_loop(&cs_td);
 
         struct check_lights_result clr = check_lights();
         d_req.code = clr.code;
