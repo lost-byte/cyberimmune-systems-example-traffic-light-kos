@@ -5,7 +5,8 @@
 #include <kos_net.h>
 
 #include "general.h"
-#include "subscriber.h"
+#include "mqtt-comm.h"
+
 
 const char* GetBrokerAddress()
 {
@@ -31,6 +32,11 @@ int GetBrokerPort()
     throw std::runtime_error{"Failed to get MQTT broker port."};
 }
 
+void OnMqttMessage(const string &topic, const string &message){
+    std::cerr << "Got from topic:" << topic << " msg:" << message << std::endl;
+}
+
+
 int main(void) try
 {
     if (!wait_for_network())
@@ -39,10 +45,23 @@ int main(void) try
     }
 
     mosqpp::lib_init();
-    auto sub = std::make_unique<Subscriber>("subscriber", GetBrokerAddress(), GetBrokerPort());
-    if (sub)
+
+    /* создание mqtt объекта */
+    auto mqtt = std::make_unique<MqqtComm>("mqtt-comm", GetBrokerAddress(), GetBrokerPort());
+    
+    /* подписаться на темы */
+    mqtt->subscribe_topic("mode");
+
+    /* Поставить обработчик сообщений */
+    mqtt->set_on_message(OnMqttMessage);
+
+    /* цикл обслуживания публикатора и подписчика */
+    while (true)
     {
-        sub->loop_forever();
+        sleep(1);
+        //mqtt->do_publish("datetime", "хрен знает");
+        mqtt->loop();
+        /* Если есть новые сообщения */
     }
 
     mosqpp::lib_cleanup();

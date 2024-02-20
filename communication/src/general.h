@@ -3,7 +3,7 @@
 #define _PUBLISHER_GENERAL_H
 
 namespace app {
-constexpr const char *AppTag = "[Subscriber] ";
+constexpr const char *AppTag = "[Communication] ";
 }
 
 #endif // _PUBLISHER_GENERAL_H

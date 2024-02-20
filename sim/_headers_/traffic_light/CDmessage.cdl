@@ -1,0 +1,8 @@
+/* Definition of the `Mode` component. */
+
+component traffic_light.CDmessage
+
+endpoints {
+    /* Declaration of a named implementation of the "Mode" interface. */
+    dmessage : traffic_light.IDiagnostics
+}

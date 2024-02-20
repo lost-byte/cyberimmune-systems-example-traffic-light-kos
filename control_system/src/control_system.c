@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 #define NK_USE_UNQUALIFIED_NAMES
 
@@ -16,20 +17,147 @@
 
 #include <assert.h>
 
-#define MODES_NUM 13
-
-
+//#define MODES_NUM 13
 static const char EntityName[] = "Control System";
+
+/* Перечисление - состояния */
+typedef enum {
+    TL_MODE_MANUAL,             // ручное управление
+    TL_MODE_UNREG,              // мигающий желтый в обоих направлениях
+    TL_MODE_GREEN1,             // 1- зеленый, 2 - красный
+    TL_MODE_TO_GREEN2_1,        // переход 1- мигает зелёный 2- мигает красный
+    TL_MODE_TO_GREEN2_2,        // переход оба желтые
+    TL_MODE_GREEN2,             // 1 - красный, 2 - зелёный
+    TL_MODE_TO_GREEN1_1,        // переход 1- мигает красный 2- мигает зелёный
+    TL_MODE_TO_GREEN1_2,        // переход оба желтые
+} TL_MODES;
+
+#define TL_MODES_CNT 8
+
+/* массив инициализаторов таймера состояния */
+uint8_t state_times[TL_MODES_CNT] = {
+    0,                                  // если мы в ручно управлении - там и оставаться
+    30,                                 // нерегулируемый
+    30,                                 // направление 1
+    5,                                  // переход к направлению 2 шаг 1
+    3,                                  // переход к направлению 2 шаг 2
+    30,                                 // направление 2
+    5,                                  // переход к направлкнию 1 шаг 1
+    3                                   // переход к направлению 1 шаг 2
+};
+
+// таблица переходов
+TL_MODES const state_transitions[TL_MODES_CNT] = {
+    TL_MODE_UNREG,                      // выходя из ручного переходим в нерегулируемый
+    TL_MODE_TO_GREEN1_1,                // из нерегулируемого начинаем включать зеленый 1
+    TL_MODE_TO_GREEN2_1,                // из зеленого 1 начинаем включать зеленый 2
+    TL_MODE_TO_GREEN2_2,                // продолжаем включать зеленый 2
+    TL_MODE_GREEN2,                     // включаем зелёный 2
+    TL_MODE_TO_GREEN1_1,                // из зеленого 2 начинаем включать зеленый 1
+    TL_MODE_TO_GREEN1_2,                // продолжаем включать зеленый 1
+    TL_MODE_GREEN1                      // включаем зелёный 1
+};
+
+/* таблица управляющих кодов для LightsGPIO */
+uint32_t const state_LightsGPIO_codes[TL_MODES_CNT] = {
+    0,                                                  // Ручное управление, код спускается сверху
+    IMode_Direction1Yellow + IMode_Direction2Yellow+    // нерегулируемый
+    IMode_Direction1Blink  + IMode_Direction2Blink,
+    IMode_Direction1Green  + IMode_Direction2Red,       // направление 1
+    IMode_Direction1Green  + IMode_Direction2Red+       // переход к направлению 2 шаг 1
+    IMode_Direction1Blink  + IMode_Direction2Blink,
+    IMode_Direction1Yellow + IMode_Direction2Yellow,    // переход к направлению 2 шаг 2
+    IMode_Direction1Red    + IMode_Direction2Green,     // направление 2
+    IMode_Direction1Red    + IMode_Direction2Green+     // переход к направлкнию 1 шаг 1
+    IMode_Direction1Blink  + IMode_Direction2Blink,
+    IMode_Direction1Yellow + IMode_Direction2Yellow,    // переход к направлению 1 шаг 2
+};
+
+/* Структура машины состояния */
+typedef struct{
+    TL_MODES mode;              // код состояния
+    uint16_t timer_secs;        // таймер 
+    bool entered;               // признак что произошел вход в состояние
+} cs_state;
+
+/* Текущее состояние */
+static cs_state current_state = {.mode = TL_MODE_UNREG, .timer_secs = 0, .entered=false};
+
+/* структура - описатель кишок IPC для вередачи в функцию IPC */
+typedef struct {
+    struct IMode_proxy *proxy;
+    IMode_FMode_req *req;
+    IMode_FMode_res *res;
+} TransportDescriptor;
+
+/* инициализатор описателя кишок IPC */
+#define DESCR_INIT(proxyIn, reqIn, resIn) \
+{                                           \
+    .proxy = proxyIn,                       \
+    .req = reqIn,                           \
+    .res = resIn,                           \
+}
+
+/* Обертка IPC к  LightsGPIO */
+int LightsGPIO_send(TransportDescriptor *td, uint32_t mode){
+    
+    if (IMode_FMode(&td->proxy->base, td->req, NULL, td->res, NULL) == rcOk)
+    {
+        /**
+         * Print result value from response
+         * (result is the output argument of the Mode method).
+         */
+        fprintf(stderr, "result = %0x\n", (int) td->res->result);
+        return 0;
+    }
+    
+    fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
+    return -1;
+}
+
+/* обобщенная функция контроля состояния */
+void state_control(TransportDescriptor * td){
+    /* Уже вошли в состояние? */
+    if (!current_state.entered){
+        /*
+        *  Еще не вошли в состояние, выполнить действия по входу 
+        */
+        
+        // установить таймер
+        current_state.timer_secs = state_times[current_state.mode];
+
+        // передать режим в LightsGPIO
+        LightsGPIO_send(td, 
+            state_LightsGPIO_codes[state_LightsGPIO_codes[current_state.mode]]
+        );
+
+        current_state.entered = true;   // флаг "уже вошли"        
+    }else{
+        /*
+        *   Уже в состоянии, обработать таймер
+        */
+
+        // истёк ли таймер?
+        if (!current_state.timer_secs){
+            current_state.timer_secs--;  // нет, истекаем
+        }else{
+            // да, перейти в следующее состояние
+            current_state.mode = state_transitions[current_state.mode];
+            current_state.entered = false;
+        }
+    }
+}
 
 /* Control system entity entry point. */
 int main(int argc, const char *argv[])
 {
     NkKosTransport transport;
-    struct traffic_light_IMode_proxy proxy;
+    struct IMode_proxy proxy;
     int i;
 
     fprintf(stderr, "[%s] started\n", EntityName);
 
+    /*
     static const nk_uint32_t tl_modes[MODES_NUM] = {
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Red,
         traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction2Red,
@@ -45,6 +173,7 @@ int main(int argc, const char *argv[])
         IMode_Direction1Blink + IMode_Direction2Blink,
         0
     };
+    */
 
     /**
      * Get the LightsGPIO IPC handle of the connection named
@@ -72,41 +201,57 @@ int main(int argc, const char *argv[])
     traffic_light_IMode_proxy_init(&proxy, &transport.base, riid);
 
     /* Request and response structures */
-    traffic_light_IMode_FMode_req req;
-    traffic_light_IMode_FMode_res res;
+    IMode_FMode_req req;
+    IMode_FMode_res res;
 
     /* Test loop. */
 
     //while(true){};
 
-    req.value = 0;
-    for (i = 0; i < MODES_NUM; i++)
-    {
-        req.value = tl_modes[i];
+    // req.value = 0;
+    // for (i = 0; i < MODES_NUM; i++)
+    // {
+        // req.value = tl_modes[i];
         /**
          * Call Mode interface method.
          * Lights GPIO will be sent a request for calling Mode interface method
          * mode_comp.mode_impl with the value argument. Calling thread is locked
          * until a response is received from the lights gpio.
          */
-        if (traffic_light_IMode_FMode(&proxy.base, &req, NULL, &res, NULL) == rcOk)
+        // if (traffic_light_IMode_FMode(&proxy.base, &req, NULL, &res, NULL) == rcOk)
 
-        {
+        // {
             /**
              * Print result value from response
              * (result is the output argument of the Mode method).
              */
-            fprintf(stderr, "result = %0x\n", (int) res.result);
+            // fprintf(stderr, "result = %0x\n", (int) res.result);
             /**
              * Include received result value into value argument
              * to resend to lights gpio in next iteration.
              */
-            req.value = res.result;
+            // req.value = res.result;
 
-        }
-        else
-            fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
-    }
+    //     }
+    //     else
+    //         fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
+    // }
     
+    /* Засунуть заиниченые кишки транспорта в одну структуру для передачи в функцию */
+    TransportDescriptor td = DESCR_INIT(
+                                &proxy, &req, &res);
+
+    /*
+    *  Не пора ли сделать нормальную машину состояний?
+    */
+
+    while(true){
+        state_control(&td);
+
+        /* крутить цикл будем с интевалом в 1 сек. */
+        sleep(1);
+    }
+
+
     return EXIT_SUCCESS;
 }

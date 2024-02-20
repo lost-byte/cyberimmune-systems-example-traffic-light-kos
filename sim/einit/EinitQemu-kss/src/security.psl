@@ -1,0 +1,231 @@
+/* Security configuration of the "traffic light" example. */
+/* nk.basic._ is required for comparison operations support in policies, like != below */
+use nk.basic._
+
+/* Definition of the execute interface. */
+execute: kl.core.Execute
+
+/* Import the file with the declaration of basic security policy aliases. */
+use nk.base._
+
+/* Declaration of entities. */
+use EDL Einit
+use EDL kl.core.Core
+use EDL kl.drivers.RAMDisk
+use EDL kl.VfsRamFs
+use EDL kl.VfsSdCardFs
+use EDL kl.VfsNet
+use EDL kl.rump.Dhcpcd
+//use EDL kl.Ntpd
+
+use EDL traffic_light.ControlSystem
+use EDL traffic_light.LightsGPIO
+use EDL traffic_light.Diagnostics
+use EDL traffic_light.Communication
+
+/* Platform-specific EDL descriptions. */
+use EDL kl.drivers.SDCard
+use EDL kl.drivers.BSP
+use EDL kl.drivers.GPIO
+
+/* Execution of entities allowed. */
+execute {
+    grant ()
+}
+
+error {
+    grant ()
+}
+
+/* Calls to the security interface are ignored. */
+security {
+    grant ()
+}
+
+/* Einit может запрашивать всё */
+request src=Einit {
+    grant ()
+}
+
+/* ядро может запрашивать всё */
+request src=kl.core.Core {
+    grant ()
+}
+
+/* Еинит может запускать всё */
+execute src = Einit 
+{
+    /* дрова */
+    match dst = kl.drivers.BSP {grant()}
+    match dst = kl.drivers.GPIO {grant()}
+    match dst = kl.drivers.RAMDisk {grant()}
+    match dst = kl.drivers.SDCard {grant()}
+
+    /* ядрёные системы */
+    match dst = kl.VfsRamFs {grant()}
+    match dst = kl.VfsSdCardFs {grant()}
+    match dst = kl.VfsNet {grant()}
+
+    /* сетевые сервисы */
+    match dst = kl.rump.Dhcpcd {grant()}
+
+    /* самодельные сущности */
+    match dst = Einit {grant()}
+    match dst = traffic_light.ControlSystem {grant()}
+    match dst = traffic_light.LightsGPIO {grant()}
+    match dst = traffic_light.Diagnostics {grant()}
+    match dst = traffic_light.Communication {grant()}
+}
+
+/* ядро могут запрашивать */
+request  dst = kl.core.Core
+{
+    /* дрова */
+    match src = kl.drivers.RAMDisk {grant()}
+    match src = kl.drivers.SDCard {grant()}
+    match src = kl.drivers.BSP {grant()}
+    match src = kl.drivers.GPIO {grant()}
+
+    /* ядрёные системы */
+    match src = kl.VfsRamFs {grant()}
+    match src = kl.VfsSdCardFs {grant()}
+    match src = kl.VfsNet {grant()}
+
+    /* сетевые сервисы */
+    match src = kl.rump.Dhcpcd {grant()}
+
+    /* сущности */
+    match src = Einit {grant()}
+    match src = traffic_light.ControlSystem {grant()}
+    match src = traffic_light.LightsGPIO {grant()}
+    match src = traffic_light.Diagnostics {grant()}
+    match src = traffic_light.Communication {grant()}
+}
+
+/* ядро может отвечать */
+response src = kl.core.Core
+{
+    match dst = kl.core.Core {grant()}    // например самому себе )) 
+
+    /* дровам */
+    match dst = kl.drivers.RAMDisk {grant()}
+    match dst = kl.drivers.SDCard {grant()}
+    match dst = kl.drivers.BSP {grant()}
+    match dst = kl.drivers.GPIO {grant()}
+
+    /* ядрёным системам */
+    match dst = kl.VfsRamFs {grant()}
+    match dst = kl.VfsSdCardFs {grant()}
+    match dst = kl.VfsNet {grant()}
+
+     /* сетевые сервисы */
+    match dst = kl.rump.Dhcpcd {grant()}
+
+    /* сущностям */
+    match dst = Einit {grant()}
+    match dst = traffic_light.ControlSystem {grant()}
+    match dst = traffic_light.LightsGPIO {grant()}
+    match dst = traffic_light.Diagnostics {grant()}
+    match dst = traffic_light.Communication {grant()}
+}
+
+/* Файловые системы разговаривают с дровами */
+request src = kl.VfsSdCardFs, dst = kl.drivers.SDCard
+{
+    grant()
+}
+
+response src = kl.drivers.SDCard, dst = kl.VfsSdCardFs
+{
+    grant()
+}
+
+request src = kl.VfsRamFs, dst = kl.drivers.RAMDisk
+{
+    grant()
+}
+
+response src = kl.drivers.RAMDisk, dst = kl.VfsRamFs
+{
+    grant()
+}
+
+/* сетевая подсистема */
+request  dst = kl.VfsNet
+{
+    match src = kl.rump.Dhcpcd {grant()}
+    match src = traffic_light.Communication {grant()}
+}
+
+response src = kl.VfsNet
+{
+    match dst = kl.rump.Dhcpcd {grant()}
+    match dst = traffic_light.Communication {grant()}
+}
+
+/* файловоя подсистема  */
+/* qemu */
+request dst = kl.VfsRamFs
+{
+    match src = kl.rump.Dhcpcd {grant()}
+    match src = traffic_light.Communication {grant()}
+}
+
+response src = kl.VfsRamFs
+{
+    match dst = kl.rump.Dhcpcd {grant()}
+    match dst = traffic_light.Communication {grant()}
+}
+/* Rpi */
+request dst = kl.VfsSdCardFs
+{
+    match src = kl.rump.Dhcpcd {grant()}
+    match src = traffic_light.Communication {grant()}
+}
+
+response src = kl.VfsSdCardFs
+{
+    match dst = kl.rump.Dhcpcd {grant()}
+    match dst = traffic_light.Communication {grant()}
+}
+
+/* Специальные разрешения по компонентам и методам сущностей */
+
+/* Система контроля */
+request src=traffic_light.ControlSystem 
+
+    /* запрашивает управление светодиодами */
+    dst=traffic_light.LightsGPIO 
+    endpoint=lightsGpio.mode 
+    method=FMode {
+        grant()
+}
+
+response  
+    dst=traffic_light.ControlSystem 
+    src=traffic_light.LightsGPIO
+    endpoint=lightsGpio.mode 
+    method=FMode {
+        grant()
+}
+
+
+/* Управление светодиодами */
+request src=traffic_light.LightsGPIO 
+
+    /* запрашивает диагностику */
+    dst=traffic_light.Diagnostics 
+    endpoint=diagnostics.dmessage 
+    method=DMessage {
+        grant()
+}
+
+/* Система связи */
+request src=traffic_light.Communication {
+    grant ()
+}
+
+
+
+
+

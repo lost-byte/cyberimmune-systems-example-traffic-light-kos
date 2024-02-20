@@ -1,0 +1,44 @@
+Performing C SOURCE FILE Test CMAKE_HAVE_LIBC_PTHREAD failed with the following output:
+Change Dir: /home/master/Development/KasperskyOS/traffic-light-kos/myfork/cyberimmune-systems-example-traffic-light-kos/sim/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_14855/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_14855.dir/build.make CMakeFiles/cmTC_14855.dir/build
+gmake[1]: Entering directory '/home/master/Development/KasperskyOS/traffic-light-kos/myfork/cyberimmune-systems-example-traffic-light-kos/sim/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_14855.dir/src.c.o
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/aarch64-kos-gcc -DCMAKE_HAVE_LIBC_PTHREAD  -fstack-protector-strong -fstack-clash-protection -O2 -mbranch-protection=standard  -o CMakeFiles/cmTC_14855.dir/src.c.o -c /home/master/Development/KasperskyOS/traffic-light-kos/myfork/cyberimmune-systems-example-traffic-light-kos/sim/CMakeFiles/CMakeTmp/src.c
+Linking C executable cmTC_14855
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/cmake -E cmake_link_script CMakeFiles/cmTC_14855.dir/link.txt --verbose=1
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/aarch64-kos-gcc -fstack-protector-strong -fstack-clash-protection -O2 -mbranch-protection=standard  -Wl,-z,noexecstack -Wl,-z,now -static  CMakeFiles/cmTC_14855.dir/src.c.o -o cmTC_14855 
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/aarch64-kos-ld: CMakeFiles/cmTC_14855.dir/src.c.o: in function `main':
+src.c:(.text.startup+0x30): undefined reference to `pthread_create'
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/aarch64-kos-ld: src.c:(.text.startup+0x40): undefined reference to `pthread_cancel'
+/opt/KasperskyOS-Community-Edition-1.1.1.40/toolchain/bin/aarch64-kos-ld: src.c:(.text.startup+0x54): undefined reference to `pthread_exit'
+collect2: error: ld returned 1 exit status
+gmake[1]: *** [CMakeFiles/cmTC_14855.dir/build.make:99: cmTC_14855] Error 1
+gmake[1]: Leaving directory '/home/master/Development/KasperskyOS/traffic-light-kos/myfork/cyberimmune-systems-example-traffic-light-kos/sim/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_14855/fast] Error 2
+
+
+Source file was:
+#include <pthread.h>
+
+static void* test_func(void* data)
+{
+  return data;
+}
+
+int main(void)
+{
+  pthread_t thread;
+  pthread_create(&thread, NULL, test_func, NULL);
+  pthread_detach(thread);
+  pthread_cancel(thread);
+  pthread_join(thread, NULL);
+  // KOS: Does not support it.
+  #if !defined(__KOS__)
+  pthread_atfork(NULL, NULL, NULL);
+  #endif
+  pthread_exit(NULL);
+
+  return 0;
+}
+

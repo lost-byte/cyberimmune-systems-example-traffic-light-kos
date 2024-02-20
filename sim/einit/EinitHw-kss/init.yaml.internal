@@ -1,0 +1,85 @@
+entities:
+
+# The `ControlSystem` entity can call `LightsGPIO`.
+- name: traffic_light.ControlSystem
+  connections:
+  - target: traffic_light.LightsGPIO
+    id: lights_gpio_connection
+
+
+
+# The `LightsGPIO` entity 
+- name: traffic_light.LightsGPIO
+  connections:
+  - target: traffic_light.Diagnostics
+    id: diagnostics_connection
+
+
+# The `Diagnostics` entity
+- name: traffic_light.Diagnostics
+#
+
+- name: traffic_light.Communication
+  env:
+    VFS_FILESYSTEM_BACKEND: client:kl.VfsRamFs
+    VFS_NETWORK_BACKEND: client:kl.VfsNet
+    MQTT_BROKER_ADDRESS: "10.0.2.2"
+    MQTT_BROKER_PORT: "1883"
+  connections:
+  - target: kl.VfsNet
+    id: kl.VfsNet
+  - target: kl.VfsRamFs
+    id: kl.VfsRamFs
+
+
+- name: kl.VfsNet
+  path: $<TARGET_FILE_NAME:precompiled_vfs::VfsNet>
+  connections:
+  - target: kl.drivers.BSP
+    id: kl.drivers.BSP
+  - target: kl.drivers.GPIO
+    id: kl.drivers.GPIO
+  args:
+        - -l
+        - devfs /dev devfs 0
+  env:
+        VFS_NETWORK_BACKEND: server:kl.VfsNet
+        VFS_FILESYSTEM_BACKEND: server:kl.VfsNet
+        DEFAULT_DNS_SERVER: 8.8.8.8
+
+- name: kl.rump.Dhcpcd
+  path: $<TARGET_FILE_NAME:rump::dhcpcd_entity>
+  connections:
+  - target: kl.VfsNet
+    id: kl.VfsNet
+  - target: kl.VfsRamFs
+    id: kl.VfsRamFs
+  args:
+    - '-4'
+    - -f
+    - /etc/dhcpcd.conf
+  env:
+    VFS_FILESYSTEM_BACKEND: client{fs->net}:kl.VfsRamFs
+    VFS_NETWORK_BACKEND: client:kl.VfsNet
+
+- name: kl.VfsRamFs
+  path: $<TARGET_FILE_NAME:precompiled_vfs::VfsRamFs>
+  connections:
+  - target: kl.drivers.RAMDisk
+    id: kl.drivers.RAMDisk
+  args:
+    - -l
+    - devfs /dev devfs 0
+  env:
+        ROOTFS: ramdisk0,0 / ext4 0
+        VFS_FILESYSTEM_BACKEND: server:kl.VfsRamFs
+
+- name: kl.drivers.BSP
+  path: $<TARGET_FILE_NAME:bsp::entity_hw>
+
+- name: kl.drivers.GPIO
+  path: $<TARGET_FILE_NAME:gpio::entity_hw>
+
+- name: kl.drivers.RAMDisk
+  path: $<TARGET_FILE_NAME:ramdisk::entity_common>
+
