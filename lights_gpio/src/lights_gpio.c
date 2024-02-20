@@ -139,6 +139,7 @@ typedef struct {
     LightsGPIO_entity entity;
 } CMode_TransportDescriptor;
 
+/* Инициализатор дескриптора lights_gpio_connection */
 void lights_gpio_connection_init(CMode_TransportDescriptor *CMode_td){
 
     /* Get lights gpio IPC handle of "lights_gpio_connection". */
@@ -166,6 +167,7 @@ void lights_gpio_connection_init(CMode_TransportDescriptor *CMode_td){
     LightsGPIO_entity_init(&CMode_td->entity, &CMode_td->component);
 }
 
+/* Процессор  дескриптора lights_gpio_connection */
 void lights_gpio_connection_loop(CMode_TransportDescriptor *CMode_td){
     /* Flush request/response buffers. */
     nk_req_reset(&CMode_td->req);
@@ -176,7 +178,7 @@ void lights_gpio_connection_loop(CMode_TransportDescriptor *CMode_td){
     if (nk_transport_recv(&CMode_td->transport.base,
                             &CMode_td->req.base_,
                             &CMode_td->req_arena) != NK_EOK) {
-        fprintf(stderr, "nk_transport_recv error\n");
+        fprintf(stderr, "[%s] nk_transport_recv error\n", EntityName);
     } else {
         /**
          * Handle received request by calling implementation Mode_impl
@@ -190,15 +192,81 @@ void lights_gpio_connection_loop(CMode_TransportDescriptor *CMode_td){
     if (nk_transport_reply(&CMode_td->transport.base,
                             &CMode_td->res.base_,
                             &CMode_td->res_arena) != NK_EOK) {
-        fprintf(stderr, "nk_transport_reply error\n");
+        fprintf(stderr, "[%s] nk_transport_reply error\n", EntityName);
     }
 }
 
+/* Теперь соединение diagnostics_connection (исходящее) */
+typedef struct{
+    struct IDiagnostics_proxy proxy;
+    NkKosTransport transport;
+    nk_iid_t riid;
+    Handle handle;
+    IDiagnostics_DMessage_req req;
+    char req_buffer[IDiagnostics_DMessage_req_arena_size];
+    struct nk_arena req_arena;
+    IDiagnostics_DMessage_req res;
+    //char res_buffer[IDiagnostics_DMessage_res_arena_size];
+    //struct nk_arena res_arena;
+}CDMmessage_TransportDescriptor;
+
+/* Инициализатор дескриптора diagnostics_connection */
+void diagnostics_connection_init(CDMmessage_TransportDescriptor *CDMmessage_td){
+    CDMmessage_td->handle = ServiceLocatorConnect("diagnostics_connection");
+    assert(CDMmessage_td->handle != INVALID_HANDLE);
+    NkKosTransport_Init(&CDMmessage_td->transport, CDMmessage_td->handle, NK_NULL, 0);
+    CDMmessage_td->riid = ServiceLocatorGetRiid(CDMmessage_td->handle, "diagnostics.dmessage");
+    assert(CDMmessage_td->riid  != INVALID_RIID);
+    IDiagnostics_proxy_init(&CDMmessage_td->proxy,
+                                &CDMmessage_td->transport.base,
+                                CDMmessage_td->riid);
+    struct nk_arena arena = NK_ARENA_INITIALIZER(
+                                CDMmessage_td->req_buffer,
+                                CDMmessage_td->req_buffer + 
+                                sizeof(CDMmessage_td->req_buffer));
+    CDMmessage_td->req_arena = arena;
+}
+
+void diagnostics_connection_loop(CDMmessage_TransportDescriptor *CDMmessage_td, 
+                                    uint32_t code,
+                                    const char * msg){
+    nk_err_t rc;
+
+    nk_req_reset(&CDMmessage_td->req);
+    nk_arena_reset(&CDMmessage_td->req_arena);
+
+    CDMmessage_td->req.code = code;
+
+    rtl_size_t msg_len = rtl_strlen(msg)+1;
+    nk_char_t *str = nk_arena_alloc(
+                    nk_char_t,
+                    &CDMmessage_td->req_arena,
+                    &CDMmessage_td->req.msg,
+                    msg_len);
+    if (str == RTL_NULL)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t allocate memory in arena!\n",
+            EntityName);
+    }
+
+    rtl_strncpy(str, msg, (rtl_size_t) msg_len);
+
+    if ((rc = IDiagnostics_DMessage(&CDMmessage_td->proxy.base,
+                            &CDMmessage_td->req,
+                            &CDMmessage_td->req_arena,
+                            &CDMmessage_td->res,
+                            NULL)
+    ) != NK_EOK){
+        fprintf(stderr, "[%s] IDiagnostics_DMessage error %d\n", EntityName, rc);
+    }
+}
 
 /* Lights GPIO entry point. */
 int main(void)
 {
-    nk_err_t rc;
+    
     fprintf(stderr, "[%s] started\n", EntityName);
 
     /* Заинитить кишки своего API */
@@ -207,28 +275,10 @@ int main(void)
 
     fprintf(stderr, "[%s] API transport inited\n", EntityName);
 
-    /* Так, а теперь подключение к Diagnostics */
-    struct IDiagnostics_proxy d_proxy;
-    Handle d_handle = ServiceLocatorConnect("diagnostics_connection");
-    assert(d_handle != INVALID_HANDLE);
 
-    NkKosTransport d_transport;  // Нужен новый?
-    NkKosTransport_Init(&d_transport, d_handle, NK_NULL, 0);
+    CDMmessage_TransportDescriptor cdm_td;
+    diagnostics_connection_init(&cdm_td);
 
-    /* получить идентификатор интерфейса */
-    nk_iid_t riid = ServiceLocatorGetRiid(d_handle, "diagnostics.dmessage");
-    assert(riid != INVALID_RIID);
-
-    /* Сделапть proxy - объект */
-    IDiagnostics_proxy_init(&d_proxy, &d_transport.base, riid);
-
-    /* определить структуры запроса и ответа */
-    IDiagnostics_DMessage_req d_req;
-    IDiagnostics_DMessage_res d_res;
-
-    char reqBuffer[IDiagnostics_DMessage_req_arena_size];
-    struct nk_arena d_arena = NK_ARENA_INITIALIZER(
-                                reqBuffer, reqBuffer + sizeof(reqBuffer));
 
     /* Dispatch loop implementation. */
     do
@@ -236,36 +286,11 @@ int main(void)
         /* прокручивать диспетчинг своего API */
         lights_gpio_connection_loop(&cs_td);
 
+        /* Типа проверка состояния */
         struct check_lights_result clr = check_lights();
-        d_req.code = clr.code;
+        diagnostics_connection_loop(&cdm_td, clr.code, clr.msg);
         
-        nk_req_reset(&d_req);
-        nk_arena_reset(&d_arena);
-
-        rtl_size_t msg_len = rtl_strlen(clr.msg)+1;
-        nk_char_t *str = nk_arena_alloc(
-                        nk_char_t,
-                        &d_arena,
-                        &d_req.msg,
-                        msg_len);
-        if (str == RTL_NULL)
-        {
-            fprintf(
-                stderr,
-                "[%s]: Error: can`t allocate memory in arena!\n",
-                EntityName);
-        }
-
-        rtl_strncpy(str, clr.msg, (rtl_size_t) msg_len);
-
-        if ((rc = IDiagnostics_DMessage(&d_proxy.base,
-                                &d_req,
-                                &d_arena,
-                                &d_res,
-                                NULL)
-        ) != NK_EOK){
-            fprintf(stderr, "[%s] IDiagnostics_DMessage error %d\n", EntityName, rc);
-        }
+        
     }
     while (true);
 

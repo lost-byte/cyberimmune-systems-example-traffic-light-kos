@@ -13,6 +13,7 @@ typedef void (*fn_ptr)(const string&, const string&);
 class MqqtComm : public mosqpp::mosquittopp
 {
 public:
+    MqqtComm();
     MqqtComm(const char *id, const char *host, int port);
     ~MqqtComm() {};
 

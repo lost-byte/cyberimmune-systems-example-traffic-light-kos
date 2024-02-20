@@ -16,12 +16,18 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 nk_build_idl_files (traffic_light_idl_files 
                     NK_MODULE "traffic_light" 
-                    IDL "resources/IMode.idl" "resources/IDiagnostics.idl")
+                    IDL "resources/IMode.idl" 
+                    "resources/IDiagnostics.idl"
+                    "resources/ICSTimes.idl"
+                    )
 
 nk_build_cdl_files (traffic_light_cdl_files 
                     IDL_TARGET traffic_light_idl_files 
                     NK_MODULE "traffic_light" 
-                    CDL "resources/CMode.cdl" "resources/CDmessage.cdl")
+                    CDL "resources/CMode.cdl"
+                    "resources/CDmessage.cdl"
+                    "resources/CCSTimes.cdl"
+                    )
 
 nk_build_edl_files (traffic_light_lights_gpio_edl_files 
                     CDL_TARGET traffic_light_cdl_files 
@@ -55,6 +61,8 @@ include_directories (${rump_INCLUDE})
 # Add a package with the VFS program implementations
 find_package (precompiled_vfs REQUIRED)
 include_directories (${precompiled_vfs_INCLUDE})
+
+find_package(nlohmann_json 3.2.0 REQUIRED)
 
 # Choose the storage devices for the configuration files.
 # If none of the options are selected, the ramfs device is used.

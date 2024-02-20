@@ -211,10 +211,17 @@ response
 
 
 /* Управление светодиодами */
-request src=traffic_light.LightsGPIO 
-
-    /* запрашивает диагностику */
+request 
+    src=traffic_light.LightsGPIO   
     dst=traffic_light.Diagnostics 
+    endpoint=diagnostics.dmessage 
+    method=DMessage {
+        grant()
+}
+
+response 
+    src= traffic_light.Diagnostics 
+    dst=traffic_light.LightsGPIO
     endpoint=diagnostics.dmessage 
     method=DMessage {
         grant()

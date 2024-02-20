@@ -14,6 +14,7 @@
 /* Description of the lights gpio interface used by the `ControlSystem` entity. */
 #include <traffic_light/ControlSystem.edl.h>
 #include <traffic_light/IMode.idl.h>
+#include <traffic_light/ICSTimes.idl.h>
 
 #include <assert.h>
 
@@ -105,16 +106,16 @@ int LightsGPIO_send(TransportDescriptor *td, uint32_t mode){
     if (IMode_FMode(&td->proxy->base, td->req, NULL, td->res, NULL) == rcOk)
     {
         
-        fprintf(stderr, "result = %0x\n", (int) td->res->result);
+        fprintf(stderr,"[%s] FMode(0x%08x)=0x%08x\n", EntityName, mode, (int) td->res->result);
         return 0;
     }
     
     
-    fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
+    fprintf(stderr, "[%s] Failed to call traffic_light.Mode.Mode()\n", EntityName);
     return -1;
 }
 
-/* обобщенная функция контроля состояния */
+/* обобщенная функция машины состояний */
 void state_control(TransportDescriptor * td){
     /* Уже вошли в состояние? */
     if (!current_state.entered){
@@ -129,11 +130,12 @@ void state_control(TransportDescriptor * td){
 
         uint32_t LightsGPIO_code = state_LightsGPIO_codes[current_state.mode];
         // передать режим в LightsGPIO
+        //fprintf(stderr, "[%s] Call FMode(0x%08x)...\n", EntityName, LightsGPIO_code);
         LightsGPIO_send(td, 
             LightsGPIO_code
         );
 
-        fprintf(stderr, "[%s] Sent mode: 0x%08x\n", EntityName, LightsGPIO_code);
+        
 
         current_state.entered = true;   // флаг "уже вошли"        
     }else{
@@ -161,27 +163,8 @@ int main()
 {
     NkKosTransport transport;
     struct IMode_proxy proxy;
-    //int i;
 
     fprintf(stderr, "[%s] started\n", EntityName);
-
-    /*
-    static const nk_uint32_t tl_modes[MODES_NUM] = {
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Red,
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction2Red,
-        traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Red,
-        traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction2Red,
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Yellow + traffic_light_IMode_Direction2Red,
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Green,
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction2Yellow,
-        traffic_light_IMode_Direction1Yellow + traffic_light_IMode_Direction1Blink + traffic_light_IMode_Direction2Yellow + traffic_light_IMode_Direction2Blink,
-        traffic_light_IMode_Direction2Green + traffic_light_IMode_Direction2Yellow,
-        traffic_light_IMode_Direction1Red + traffic_light_IMode_Direction1Green,
-        traffic_light_IMode_Direction1Green + traffic_light_IMode_Direction2Green, // <-- try to forbid this via security policies
-        IMode_Direction1Blink + IMode_Direction2Blink,
-        0
-    };
-    */
 
     /**
      * Get the LightsGPIO IPC handle of the connection named
@@ -212,38 +195,7 @@ int main()
     IMode_FMode_req req;
     IMode_FMode_res res;
 
-    /* Test loop. */
-
-    //while(true){};
-
-    // req.value = 0;
-    // for (i = 0; i < MODES_NUM; i++)
-    // {
-        // req.value = tl_modes[i];
-        /**
-         * Call Mode interface method.
-         * Lights GPIO will be sent a request for calling Mode interface method
-         * mode_comp.mode_impl with the value argument. Calling thread is locked
-         * until a response is received from the lights gpio.
-         */
-        // if (traffic_light_IMode_FMode(&proxy.base, &req, NULL, &res, NULL) == rcOk)
-
-        // {
-            /**
-             * Print result value from response
-             * (result is the output argument of the Mode method).
-             */
-            // fprintf(stderr, "result = %0x\n", (int) res.result);
-            /**
-             * Include received result value into value argument
-             * to resend to lights gpio in next iteration.
-             */
-            // req.value = res.result;
-
-    //     }
-    //     else
-    //         fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
-    // }
+    
     
     /* Засунуть заиниченые кишки транспорта в одну структуру для передачи в функцию */
     TransportDescriptor td = DESCR_INIT(

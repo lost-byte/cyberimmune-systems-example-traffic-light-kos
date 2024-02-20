@@ -1,0 +1,8 @@
+/* Компонент`CSTimes` установка времён переключения режимов */
+
+component traffic_light.CCSTimes
+
+endpoints {
+    /* именная реализация интерфейса ICSTimes */
+    cstimes : traffic_light.ICSTimes
+}

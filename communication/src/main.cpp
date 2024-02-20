@@ -6,7 +6,13 @@
 
 #include "general.h"
 #include "mqtt-comm.h"
+#include <nlohmann/json.hpp>
 
+using json = nlohmann::json;
+
+static const char EntityName[] = "Communication";
+
+MqqtComm *mqtt;
 
 const char* GetBrokerAddress()
 {
@@ -32,8 +38,36 @@ int GetBrokerPort()
     throw std::runtime_error{"Failed to get MQTT broker port."};
 }
 
+/* Обработчик сообщений темы mode */
+int set_mode(const string &message){
+
+    try{
+        json jmode = json::parse(message);
+
+        if (!jmode.contains("mode")) return -2;
+        return 0;
+
+    }catch (json::parse_error& ex){
+        std::cerr << app::AppTag <<" parce error" << std::endl;
+        return -1;
+    }
+    
+    
+}
+
+/* обработчик сообщений из подписки */
 void OnMqttMessage(const string &topic, const string &message){
-    std::cerr << "Got from topic:" << topic << " msg:" << message << std::endl;
+    int res;
+    std::cerr << app::AppTag <<" Got from topic:" << topic << " msg:" << message << std::endl;
+
+    if (topic == "mode"){
+        res = set_mode(message);
+        if (res<0){
+            mqtt->do_publish("mode_resp", "error");
+        }else{
+            mqtt->do_publish("mode_resp", "success");
+        }
+    }
 }
 
 
@@ -47,7 +81,9 @@ int main(void) try
     mosqpp::lib_init();
 
     /* создание mqtt объекта */
-    auto mqtt = std::make_unique<MqqtComm>("mqtt-comm", GetBrokerAddress(), GetBrokerPort());
+    //auto mqtt = std::make_unique<MqqtComm>("mqtt-comm", GetBrokerAddress(), GetBrokerPort());
+    auto mqtt_obj = MqqtComm("mqtt-comm", GetBrokerAddress(), GetBrokerPort());
+    mqtt = &mqtt_obj;
     
     /* подписаться на темы */
     mqtt->subscribe_topic("mode");
