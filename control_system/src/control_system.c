@@ -100,16 +100,15 @@ typedef struct {
 
 /* Обертка IPC к  LightsGPIO */
 int LightsGPIO_send(TransportDescriptor *td, uint32_t mode){
-    
+
+    td->req->value = mode;
     if (IMode_FMode(&td->proxy->base, td->req, NULL, td->res, NULL) == rcOk)
     {
-        /**
-         * Print result value from response
-         * (result is the output argument of the Mode method).
-         */
+        
         fprintf(stderr, "result = %0x\n", (int) td->res->result);
         return 0;
     }
+    
     
     fprintf(stderr, "Failed to call traffic_light.Mode.Mode()\n");
     return -1;
@@ -122,14 +121,19 @@ void state_control(TransportDescriptor * td){
         /*
         *  Еще не вошли в состояние, выполнить действия по входу 
         */
-        
+        fprintf(stderr, "[%s] Enter state: %u\n", EntityName, current_state.mode);
         // установить таймер
         current_state.timer_secs = state_times[current_state.mode];
 
+        fprintf(stderr, "[%s] State time: %u\n", EntityName, current_state.timer_secs);
+
+        uint32_t LightsGPIO_code = state_LightsGPIO_codes[current_state.mode];
         // передать режим в LightsGPIO
         LightsGPIO_send(td, 
-            state_LightsGPIO_codes[state_LightsGPIO_codes[current_state.mode]]
+            LightsGPIO_code
         );
+
+        fprintf(stderr, "[%s] Sent mode: 0x%08x\n", EntityName, LightsGPIO_code);
 
         current_state.entered = true;   // флаг "уже вошли"        
     }else{
@@ -137,23 +141,27 @@ void state_control(TransportDescriptor * td){
         *   Уже в состоянии, обработать таймер
         */
 
+        // если таймер выключен, значит так и остаёмся в режиме
+        if (current_state.timer_secs==0) return;
+
         // истёк ли таймер?
-        if (!current_state.timer_secs){
+        if (current_state.timer_secs>1){
             current_state.timer_secs--;  // нет, истекаем
         }else{
             // да, перейти в следующее состояние
             current_state.mode = state_transitions[current_state.mode];
+            fprintf(stderr, "[%s] Switch to state: %u\n", EntityName, current_state.mode);
             current_state.entered = false;
         }
     }
 }
 
 /* Control system entity entry point. */
-int main(int argc, const char *argv[])
+int main()
 {
     NkKosTransport transport;
     struct IMode_proxy proxy;
-    int i;
+    //int i;
 
     fprintf(stderr, "[%s] started\n", EntityName);
 
@@ -241,10 +249,11 @@ int main(int argc, const char *argv[])
     TransportDescriptor td = DESCR_INIT(
                                 &proxy, &req, &res);
 
-    /*
-    *  Не пора ли сделать нормальную машину состояний?
-    */
+    fprintf(stderr, "[%s] IPC to LightsGPIO inited...\n", EntityName);
 
+    /*
+    *  основной цикл, обслуга машины состояний
+    */
     while(true){
         state_control(&td);
 

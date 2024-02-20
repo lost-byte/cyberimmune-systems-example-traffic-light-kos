@@ -94,12 +94,13 @@ struct check_lights_result check_lights(){
      
 
     /* если вместе с зелёным горит чтото еще - сомнительное*/
-    if ((lights_bitfield&0x4)&&(lights_bitfield&0xB)){
+    /* но зелёный может мигать */
+    if ((lights_bitfield&0x4)&&(lights_bitfield&0x3)){
         clr.code = LIGHST_DOUBTFUL;
         strncpy(clr.msg,"seems doubtful state",256);
         return clr;
     }
-    if ((lights_bitfield&0x400)&&(lights_bitfield&0xB00)){
+    if ((lights_bitfield&0x400)&&(lights_bitfield&0x300)){
         clr.code = LIGHST_DOUBTFUL;
         strncpy(clr.msg,"seems doubtful state",256);
         return clr;
@@ -121,6 +122,23 @@ struct check_lights_result check_lights(){
 
     return clr;
 }
+
+/* вынесем код обслуги IPC в отдельные функции */
+/* Дескриптор соединения lights_gpio_connection */
+typedef struct {
+    //struct IMode_proxy *proxy;
+    //IMode_FMode_req *req;
+    //IMode_FMode_res *res;
+} CMode_TransportDescriptor;
+
+CMode_TransportDescriptor lights_gpio_connection_init(){
+
+}
+
+void lights_gpio_connection_loop(){
+
+}
+
 
 /* Lights GPIO entry point. */
 int main(void)
@@ -147,14 +165,14 @@ int main(void)
      * lights gpio transport methods (nk_transport_recv, nk_transport_reply) and
      * to the lights gpio method.
      */
-    traffic_light_LightsGPIO_entity_req req;
-    char req_buffer[traffic_light_LightsGPIO_entity_req_arena_size];
+    LightsGPIO_entity_req req;
+    char req_buffer[LightsGPIO_entity_req_arena_size];
     struct nk_arena req_arena = NK_ARENA_INITIALIZER(req_buffer,
                                         req_buffer + sizeof(req_buffer));
 
     /* Prepare response structures: constant part and arena. */
-    traffic_light_LightsGPIO_entity_res res;
-    char res_buffer[traffic_light_LightsGPIO_entity_res_arena_size];
+    LightsGPIO_entity_res res;
+    char res_buffer[LightsGPIO_entity_res_arena_size];
     struct nk_arena res_arena = NK_ARENA_INITIALIZER(res_buffer,
                                         res_buffer + sizeof(res_buffer));
 
@@ -162,14 +180,14 @@ int main(void)
      * Initialize mode component dispatcher. 3 is the value of the step,
      * which is the number by which the input value is increased.
      */
-    traffic_light_CMode_component component;
-    traffic_light_CMode_component_init(&component, CreateIModeImpl(0x1000000));
+    CMode_component component;
+    CMode_component_init(&component, CreateIModeImpl(0x1000000));
 
     /* Initialize lights gpio entity dispatcher. */
-    traffic_light_LightsGPIO_entity entity;
-    traffic_light_LightsGPIO_entity_init(&entity, &component);
+    LightsGPIO_entity entity;
+    LightsGPIO_entity_init(&entity, &component);
 
-    /* Так, а тепер подключение к Diagnostics */
+    /* Так, а теперь подключение к Diagnostics */
     struct IDiagnostics_proxy d_proxy;
     Handle d_handle = ServiceLocatorConnect("diagnostics_connection");
     assert(d_handle != INVALID_HANDLE);
