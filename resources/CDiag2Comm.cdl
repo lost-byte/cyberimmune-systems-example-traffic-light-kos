@@ -1,8 +1,0 @@
-/* Definition of the `Mode` component. */
-
-component traffic_light.CDiag2Comm
-
-endpoints {
-    /* Declaration of a named implementation of the "Mode" interface. */
-    dcode : traffic_light.IDiag2Comm
-}

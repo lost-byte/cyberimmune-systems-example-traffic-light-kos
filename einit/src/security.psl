@@ -242,5 +242,17 @@ response
     grant ()
 }
 
+request 
+    src=traffic_light.Diagnostics 
+    dst=traffic_light.Communication 
+{
+    grant ()
+}
 
+response 
+    src=traffic_light.Communication 
+    dst=traffic_light.Diagnostics 
+{
+    grant ()
+}
 

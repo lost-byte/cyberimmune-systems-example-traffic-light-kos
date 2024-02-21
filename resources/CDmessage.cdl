@@ -1,4 +1,4 @@
-/* Definition of the `Mode` component. */
+/* Definition of the `Dmessage` component. */
 
 component traffic_light.CDmessage
 

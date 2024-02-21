@@ -75,6 +75,8 @@
         "idiagnostics.idl.h": "c",
         "icsmode.idl.h": "c",
         "span": "cpp",
-        "controlsystem.edl.h": "c"
+        "controlsystem.edl.h": "c",
+        "idiag2comm.idl.h": "c",
+        "idiagcomm.idl.h": "c"
     }
 }

@@ -3,6 +3,7 @@
 #include <memory>
 
 #include <kos_net.h>
+#include <pthread.h>
 
 #include "general.h"
 #include "mqtt-comm.h"
@@ -21,6 +22,23 @@
 using json = nlohmann::json;
 
 static const char EntityName[] = "Communication";
+
+/* Дескриптор соединения diagcomm_connection (входящее) */
+typedef struct {
+    NkKosTransport transport;
+    ServiceId iid;
+    Handle handle;
+    Communication_entity_req req;
+    char req_buffer[Communication_entity_req_arena_size];
+    struct nk_arena req_arena;
+    Communication_entity_res res;
+    char res_buffer[Communication_entity_res_arena_size];
+    struct nk_arena res_arena;
+    CDiagComm_component component;
+    Communication_entity entity;
+} DCode_TransportDescriptor;
+
+static DCode_TransportDescriptor dcode_td;
 
 /* Соединение control_system_connection (исходящее) */
 typedef struct{
@@ -165,7 +183,94 @@ void OnMqttMessage(const string &topic, const string &message){
     }
 }
 
-/* Инициализатор дескриптора control_system_connection */
+/* Реализация метода  DCode */
+static nk_err_t DCode(struct IDiagComm *self,
+                        const
+                        struct IDiagComm_DCode_req *req,
+                        const
+                        struct nk_arena *req_arena,
+                        struct IDiagComm_DCode_res *res,
+                        struct nk_arena *res_arena)
+{
+    
+    //std::cerr << app::AppTag << req->code << std::endl;
+    std::cerr << app::AppTag << "got diag" << std::endl;
+    return NK_EOK;
+}
+
+static struct traffic_light_IDiagComm *CreateIDiagCommImpl()
+{
+    /* Table of implementations of IMode interface methods. */
+    static const struct traffic_light_IDiagComm_ops ops = {
+        .DCode = DCode
+    };
+
+    static struct traffic_light_IDiagComm obj =
+    {
+        .ops = &ops
+    };
+
+    return &obj;
+}
+
+/* Инициализатор дескриптора diagcomm_connection (входящее) */
+void diagcomm_connection_init(DCode_TransportDescriptor *td){
+
+    /* Get lights gpio IPC handle of "diagcomm_connection". */
+    td->handle = ServiceLocatorRegister("diagcomm_connection", NULL, 0, &td->iid);
+    assert(td->handle != INVALID_HANDLE);
+
+    /* Initialize transport to control system. */
+    NkKosTransport_Init(&td->transport, td->handle, NK_NULL, 0);
+
+    // Структуры запрос/ответ
+    struct nk_arena req_arena = NK_ARENA_INITIALIZER(td->req_buffer,
+                                        td->req_buffer + sizeof(td->req_buffer));
+
+    
+    struct nk_arena res_arena = NK_ARENA_INITIALIZER(td->res_buffer,
+                                        td->res_buffer + sizeof(td->res_buffer));
+
+    td->req_arena = req_arena;
+    td->res_arena = res_arena;
+
+    // диспетчер компонент
+    CDiagComm_component_init(&td->component, CreateIDiagCommImpl());
+
+    /* Initialize lights gpio entity dispatcher. */
+    Communication_entity_init(&td->entity, &td->component);
+}
+
+/* Процессор  дескриптора lights_gpio_connection (входящее) */
+void diagcomm_connection_loop(DCode_TransportDescriptor *td){
+    /* Flush request/response buffers. */
+    nk_req_reset(&td->req);
+    nk_arena_reset(&td->req_arena);
+    nk_arena_reset(&td->res_arena);
+
+    /* Wait for request to lights gpio entity. */
+    if (nk_transport_recv(&td->transport.base,
+                            &td->req.base_,
+                            &td->req_arena) != NK_EOK) {
+        fprintf(stderr, "[%s] nk_transport_recv error\n", EntityName);
+    } else {
+        /**
+         * Handle received request by calling implementation Mode_impl
+         * of the requested Mode interface method.
+         */
+        Communication_entity_dispatch(&td->entity, &td->req.base_, &td->req_arena,
+                                    &td->res.base_, &td->res_arena);
+    }
+
+    /* Send response. */
+    if (nk_transport_reply(&td->transport.base,
+                            &td->res.base_,
+                            &td->res_arena) != NK_EOK) {
+        fprintf(stderr, "[%s] nk_transport_reply error\n", EntityName);
+    }
+}
+
+/* Инициализатор дескриптора control_system_connection (исходящее) */
 void control_system_connection_init(CSMode_TransportDescriptor *CSMode_td){
     CSMode_td->handle = ServiceLocatorConnect("control_system_connection");
     assert(CSMode_td->handle != INVALID_HANDLE);
@@ -224,6 +329,13 @@ nk_err_t control_system_CSMode(CSMode_TransportDescriptor *CSMode_td,
     return 0;
 }
 
+void *diagcomm_loop(void *td){
+    while(true){
+        diagcomm_connection_loop((DCode_TransportDescriptor *)td);
+        sleep(1);
+    }
+}
+
 int main(void) try
 {
     if (!wait_for_network())
@@ -245,16 +357,28 @@ int main(void) try
     mqtt->set_on_message(OnMqttMessage);
 
     
-
+    /* инициализировать соединение с control system */
     control_system_connection_init(&cst_td);
+
+    /* инициализировать соединение с Diagnostics */
+    diagcomm_connection_init(&dcode_td);
+
+    pthread_t thread;
+    int retCode = pthread_create(&thread, NULL, diagcomm_loop, &dcode_td);
+    if (retCode != 0)
+    {
+        fprintf(stderr, "[%s] pthread_create returns error %d\n", EntityName, retCode);
+        return false;
+    }
 
     /* цикл обслуживания публикатора и подписчика */
     while (true)
     {
         sleep(1);
-        //mqtt->do_publish("datetime", "хрен знает");
+        
         mqtt->loop();
-        /* Если есть новые сообщения */
+        
+        //diagnostics_connection_loop(&dcode_td);
     }
 
     mosqpp::lib_cleanup();

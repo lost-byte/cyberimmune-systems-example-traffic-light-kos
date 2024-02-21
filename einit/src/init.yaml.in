@@ -17,6 +17,9 @@ entities:
 
 # The `Diagnostics` entity
 - name: traffic_light.Diagnostics
+  connections:
+  - target: traffic_light.Communication
+    id: diagcomm_connection
 #@INIT_Diagnostics_ENTITY_CONNECTIONS@
 
 - name: traffic_light.Communication

@@ -19,6 +19,7 @@ nk_build_idl_files (traffic_light_idl_files
                     IDL "resources/IMode.idl" 
                     "resources/IDiagnostics.idl"
                     "resources/ICSMode.idl"
+                    "resources/IDiagComm.idl"
                     )
 
 nk_build_cdl_files (traffic_light_cdl_files 
@@ -27,6 +28,7 @@ nk_build_cdl_files (traffic_light_cdl_files
                     CDL "resources/CMode.cdl"
                     "resources/CDmessage.cdl"
                     "resources/CCSMode.cdl"
+                    "resources/CDiagComm.cdl"
                     )
 
 nk_build_edl_files (traffic_light_lights_gpio_edl_files 

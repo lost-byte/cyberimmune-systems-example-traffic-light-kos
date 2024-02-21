@@ -1,8 +1,8 @@
 /* Package with an "IMode" interface declaration. */
 
-package traffic_light.IDiag2Comm
+package traffic_light.IDiagComm
 
 interface {
     /* IMode interface method */
-    DMessage(in UInt32 code);
+    DCode(in UInt32 code);
 }

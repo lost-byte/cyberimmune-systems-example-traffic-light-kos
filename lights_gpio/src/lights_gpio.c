@@ -205,7 +205,7 @@ typedef struct {
     LightsGPIO_entity entity;
 } CMode_TransportDescriptor;
 
-/* Инициализатор дескриптора lights_gpio_connection */
+/* Инициализатор дескриптора lights_gpio_connection (входящее) */
 void lights_gpio_connection_init(CMode_TransportDescriptor *CMode_td){
 
     /* Get lights gpio IPC handle of "lights_gpio_connection". */
@@ -233,7 +233,7 @@ void lights_gpio_connection_init(CMode_TransportDescriptor *CMode_td){
     LightsGPIO_entity_init(&CMode_td->entity, &CMode_td->component);
 }
 
-/* Процессор  дескриптора lights_gpio_connection */
+/* Процессор  дескриптора lights_gpio_connection (входящее) */
 void lights_gpio_connection_loop(CMode_TransportDescriptor *CMode_td){
     /* Flush request/response buffers. */
     nk_req_reset(&CMode_td->req);
@@ -276,7 +276,7 @@ typedef struct{
     //struct nk_arena res_arena;
 }CDMmessage_TransportDescriptor;
 
-/* Инициализатор дескриптора diagnostics_connection */
+/* Инициализатор дескриптора diagnostics_connection (исходящее) */
 void diagnostics_connection_init(CDMmessage_TransportDescriptor *CDMmessage_td){
     CDMmessage_td->handle = ServiceLocatorConnect("diagnostics_connection");
     assert(CDMmessage_td->handle != INVALID_HANDLE);

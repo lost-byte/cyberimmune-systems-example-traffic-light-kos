@@ -87,14 +87,14 @@ typedef struct{
 /* Текущее состояние */
 static cs_state current_state = {.mode = TL_MODE_UNREG, .timer_secs = 0, .entered=false};
 
-/* структура - описатель кишок IPC с LightsGPIO */
+/* структура - описатель  IPC с LightsGPIO */
 typedef struct {
     struct IMode_proxy *proxy;
     IMode_FMode_req *req;
     IMode_FMode_res *res;
 } TransportDescriptor;
 
-/* инициализатор описателя кишок IPC с LightsGPIO */
+/* инициализатор описателя  IPC с LightsGPIO */
 #define DESCR_INIT(proxyIn, reqIn, resIn) \
 {                                           \
     .proxy = proxyIn,                       \
@@ -343,7 +343,7 @@ int main()
      * and lights gpio interface identifier (riid). Each method of the
      * proxy object will be implemented by sending a request to the lights gpio.
      */
-    traffic_light_IMode_proxy_init(&proxy, &transport.base, riid);
+    IMode_proxy_init(&proxy, &transport.base, riid);
 
     /* Request and response structures */
     IMode_FMode_req req;

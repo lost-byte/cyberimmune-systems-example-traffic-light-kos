@@ -11,12 +11,67 @@
 
 /* Description of the server interface used by the `client` entity. */
 #include <traffic_light/Diagnostics.edl.h>
+#include <traffic_light/IDiagComm.idl.h>
 
 #include <assert.h>
 
 #define EXAMPLE_VALUE_TO_SEND 777
 
 static const char EntityName[] = "Diagnostics";
+
+
+
+/* Соединение diagnostics->communication (исходящее) */
+typedef struct{
+    struct IDiagComm_proxy proxy;
+    NkKosTransport transport;
+    nk_iid_t riid;
+    Handle handle;
+    IDiagComm_DCode_req req;
+    char req_buffer[IDiagnostics_DMessage_req_arena_size];
+    struct nk_arena req_arena;
+    IDiagComm_DCode_res res;
+    //char res_buffer[IDiagnostics_DMessage_res_arena_size];
+    //struct nk_arena res_arena;
+}CDiagComm_TransportDescriptor;
+
+CDiagComm_TransportDescriptor CDiagComm_td;
+
+/* Инициализатор дескриптора diagnostics_connection */
+void communication_connection_init(CDiagComm_TransportDescriptor *td){
+    td->handle = ServiceLocatorConnect("diagcomm_connection");
+    assert(td->handle != INVALID_HANDLE);
+    NkKosTransport_Init(&td->transport, td->handle, NK_NULL, 0);
+    td->riid = ServiceLocatorGetRiid(td->handle, "communication.dcode");
+    assert(td->riid  != INVALID_RIID);
+    IDiagComm_proxy_init(&td->proxy,
+                                &td->transport.base,
+                                td->riid);
+    struct nk_arena arena = NK_ARENA_INITIALIZER(
+                                td->req_buffer,
+                                td->req_buffer + 
+                                sizeof(td->req_buffer));
+    td->req_arena = arena;
+}
+
+void communication_connection_send(CDiagComm_TransportDescriptor *td, 
+                                    uint32_t code){
+    nk_err_t rc;
+
+    nk_req_reset(&td->req);
+    //nk_arena_reset(&td->req_arena);
+
+    td->req.code = code;
+
+    if ((rc = IDiagComm_DCode(&td->proxy.base,
+                            &td->req,
+                            NULL,
+                            &td->res,
+                            NULL)
+    ) != NK_EOK){
+        fprintf(stderr, "[%s] IDiagComm_DCode error %d\n", EntityName, rc);
+    }
+}
 
 /* структура - описатель IPC с LightsGPIO (входящее) */
 typedef struct {
@@ -50,6 +105,8 @@ static nk_err_t Dmesage(struct traffic_light_IDiagnostics *self,
                             nk_char_t, req_arena, &(req->msg), &msg_len);
 
     fprintf(stderr, "[%s]: Code[%u], Message:\"%s\"\n", EntityName, code, msg);
+
+    
 
     return NK_EOK;
 }
@@ -129,70 +186,21 @@ void diagnostics_connection_loop(CDmessage_TransportDescriptor *td){
 /* Client entity entry point. */
 int main(int argc, const char *argv[])
 {
-    
-    // NkKosTransport transport;
-    // ServiceId iid;
-    
+      
     CDmessage_TransportDescriptor CDmessage_td;
+    
         
     fprintf(stderr, "[%s] started\n", EntityName);
 
-    // Handle handle = ServiceLocatorRegister("diagnostics_connection", NULL, 0, &iid);
-    // assert(handle != INVALID_HANDLE);
-
-    // NkKosTransport_Init(&transport, handle, NK_NULL, 0);
-
-    /* Подготовка структур запроса и ответа */
-    // Diagnostics_entity_req req;
-    // Diagnostics_entity_res res;
-
-    // char req_buffer[Diagnostics_entity_req_arena_size];
-    // struct nk_arena req_arena = NK_ARENA_INITIALIZER(req_buffer,
-    //                                     req_buffer + sizeof(req_buffer));
-
-    // char res_buffer[Diagnostics_entity_res_arena_size];
-    // struct nk_arena res_arena = NK_ARENA_INITIALIZER(res_buffer,
-    //                                     res_buffer + sizeof(res_buffer));
-
-
-    /* Инициализировать методы диспетчера компонента */
-    // CDmessage_component component;
-    // CDmessage_component_init(&component, CreateIDiagnostics_Impl());
-
-    /* Инициализировать методы диспетчера сервера  */
-    // Diagnostics_entity entity;
-    // Diagnostics_entity_init(&entity, &component);
-
     diagnostics_connection_init(&CDmessage_td);
+
+    
 
     /* Рабочий цикл */
     while(true){
         diagnostics_connection_loop(&CDmessage_td);
-        /* Flush request/response buffers. */
-        // nk_req_reset(&req);
-        // nk_arena_reset(&req_arena);
-        // nk_arena_reset(&res_arena);
-
-        /* Wait for request to lights gpio entity. */
-        // if (nk_transport_recv(&transport.base,
-        //                       &req.base_,
-        //                       &req_arena) != NK_EOK) {
-        //     fprintf(stderr, "nk_transport_recv error\n");
-        // } else {
-            /**
-             * Handle received request by calling implementation Mode_impl
-             * of the requested Mode interface method.
-             */
-        //     Diagnostics_entity_dispatch(&entity, &req.base_, &req_arena,
-        //                                 &res.base_, &res_arena);
-        // }
-
-        /* Send response. */
-        // if (nk_transport_reply(&transport.base,
-        //                        &res.base_,
-        //                        &res_arena) != NK_EOK) {
-        //     fprintf(stderr, "nk_transport_reply error\n");
-        // }
+        communication_connection_send(&CDiagComm_td, 12);
+        
     };
 
     return EXIT_SUCCESS;

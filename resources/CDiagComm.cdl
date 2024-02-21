@@ -1,0 +1,8 @@
+/* Definition of the `Diag2Comm` component. */
+
+component traffic_light.CDiagComm
+
+endpoints {
+    /* Declaration of a named implementation of the "Mode" interface. */
+    dcode : traffic_light.IDiagComm
+}
