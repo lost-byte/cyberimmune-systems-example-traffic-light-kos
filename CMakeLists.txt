@@ -18,7 +18,7 @@ nk_build_idl_files (traffic_light_idl_files
                     NK_MODULE "traffic_light" 
                     IDL "resources/IMode.idl" 
                     "resources/IDiagnostics.idl"
-                    "resources/ICSTimes.idl"
+                    "resources/ICSMode.idl"
                     )
 
 nk_build_cdl_files (traffic_light_cdl_files 
@@ -26,7 +26,7 @@ nk_build_cdl_files (traffic_light_cdl_files
                     NK_MODULE "traffic_light" 
                     CDL "resources/CMode.cdl"
                     "resources/CDmessage.cdl"
-                    "resources/CCSTimes.cdl"
+                    "resources/CCSMode.cdl"
                     )
 
 nk_build_edl_files (traffic_light_lights_gpio_edl_files 
@@ -35,6 +35,7 @@ nk_build_edl_files (traffic_light_lights_gpio_edl_files
                     EDL "resources/LightsGPIO.edl")
 
 nk_build_edl_files (traffic_light_control_system_edl_files 
+                    CDL_TARGET traffic_light_cdl_files
                     NK_MODULE "traffic_light" 
                     EDL "resources/ControlSystem.edl")
 
@@ -44,6 +45,7 @@ nk_build_edl_files (traffic_light_diagnostics_edl_files
                     EDL "resources/Diagnostics.edl")
 
 nk_build_edl_files (traffic_light_communication_edl_files 
+                    CDL_TARGET traffic_light_cdl_files
                     NK_MODULE "traffic_light" 
                     EDL "resources/Communication.edl")
 

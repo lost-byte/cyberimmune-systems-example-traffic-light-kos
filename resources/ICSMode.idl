@@ -1,0 +1,18 @@
+/* Декларация интерфейса установки времени переключения состояний */
+
+package traffic_light.ICSMode
+
+const UInt8 MaxTimesSize = 8;
+
+typedef sequence<UInt16, MaxTimesSize> ArrayTimes;
+
+struct CSModeReq{
+    UInt8 mode;                 // режим 1- ручной 2-авто 3-нерегулируемый
+    ArrayTimes times;           // 8 времён нахождения в режиме
+    UInt16      manualSet;     // битфилд ручного управления
+}
+
+interface {
+    /* ICSTimes interface method */
+    CSMode(in CSModeReq modeReq, out UInt8 ask);
+}

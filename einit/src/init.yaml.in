@@ -30,6 +30,8 @@ entities:
     id: kl.VfsNet
   - target: @ROOTFS_ENTITY@
     id: @ROOTFS_ENTITY@
+  - target: traffic_light.ControlSystem
+    id: control_system_connection
 @INIT_Communication_ENTITY_CONNECTIONS+@
 
 @INIT_EXTERNAL_ENTITIES@

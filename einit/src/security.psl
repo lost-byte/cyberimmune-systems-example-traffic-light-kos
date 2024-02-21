@@ -228,11 +228,19 @@ response
 }
 
 /* Система связи */
-request src=traffic_light.Communication {
+request 
+    src=traffic_light.Communication 
+    dst=traffic_light.ControlSystem 
+{
     grant ()
 }
 
-
+response 
+    src=traffic_light.ControlSystem 
+    dst=traffic_light.Communication 
+{
+    grant ()
+}
 
 
 

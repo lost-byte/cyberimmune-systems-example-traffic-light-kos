@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <string.h>
+#include <strings.h>
 #include <rtl/string.h>
 
 #define NK_USE_UNQUALIFIED_NAMES
@@ -15,6 +17,12 @@
 #include <traffic_light/IDiagnostics.idl.h>
 
 #include <assert.h>
+
+#define CLR_RED      "\x1b[91m"
+#define CLR_YELLOW   "\x1b[93m"
+#define CLR_GREEN    "\x1b[92m"
+#define CLR_RESET    "\x1b[0m"
+
 
 static const char EntityName[] = "LightsGPIO";
 
@@ -123,8 +131,66 @@ struct check_lights_result check_lights(){
     return clr;
 }
 
+/* Консольный имитатор светофора */
+void lights_stub(){
+    uint8_t dir1 = lights_bitfield&0xF;
+    uint8_t dir2 = ((lights_bitfield&0xF00)>>8);
+
+    char dir1_str[128]; 
+    char dir2_str[128];
+
+    bzero(dir1_str,32),bzero(dir2_str,32);
+
+    int next = 0;
+
+    /* dir1 */
+    if (dir1&0x8){
+        next += sprintf( dir1_str+next, "%s", "BLINK:" );
+    }else{
+        next += sprintf( dir1_str+next, "%s", "SOLID:" );
+    }
+
+    if (dir1&0x1){
+        next += sprintf( dir1_str+next, "%s%c", CLR_RED, 'R' );
+    }
+
+    if (dir1&0x2){
+        next += sprintf( dir1_str+next, "%s%c", CLR_YELLOW, 'Y' );
+    }
+
+    if (dir1&0x4){
+        next += sprintf( dir1_str+next, "%s%c", CLR_GREEN, 'G' );
+    }
+    sprintf( dir1_str+next, "%s", CLR_RESET );
+
+    /* dir2 */
+    next = 0;
+    if (dir2&0x8){
+        next += sprintf( dir2_str+next, "%s", "BLINK:" );
+    }else{
+        next += sprintf( dir2_str+next, "%s", "SOLID:" );
+    }
+
+    if (dir2&0x1){
+        next += sprintf( dir2_str+next, "%s%c", CLR_RED, 'R' );
+    }
+
+    if (dir2&0x2){
+        next += sprintf( dir2_str+next, "%s%c", CLR_YELLOW, 'Y' );
+    }
+
+    if (dir2&0x4){
+        next += sprintf( dir2_str+next, "%s%c", CLR_GREEN, 'G' );
+    }
+    sprintf( dir2_str+next, "%s", CLR_RESET );
+
+    fprintf(stderr, "[%s] Dir1: %s Dir2: %s\n", EntityName, dir1_str, dir2_str);
+
+}
+
+
 /* вынесем код обслуги IPC в отдельные функции */
-/* Дескриптор соединения lights_gpio_connection */
+/* Дескриптор соединения lights_gpio_connection (входящее) */
 typedef struct {
     NkKosTransport transport;
     ServiceId iid;
@@ -285,6 +351,9 @@ int main(void)
     {
         /* прокручивать диспетчинг своего API */
         lights_gpio_connection_loop(&cs_td);
+
+        /* Типа имитация светофора */
+        lights_stub();
 
         /* Типа проверка состояния */
         struct check_lights_result clr = check_lights();
