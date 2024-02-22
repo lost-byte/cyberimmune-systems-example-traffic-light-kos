@@ -4,6 +4,7 @@
 
 #include <kos_net.h>
 #include <pthread.h>
+#include <strings.h>
 
 #include "general.h"
 #include "mqtt-comm.h"
@@ -183,6 +184,38 @@ void OnMqttMessage(const string &topic, const string &message){
     }
 }
 
+#define LIGHTS_OK 42
+#define LIGHTS_FORBIDDEN 13
+#define LIGHTS_ALLOFF 99
+#define LIGHST_DOUBTFUL 63
+
+void dcode_to_mqtt(uint8_t code){
+    char msg[128];
+    bzero(msg,128);
+
+    char * descript;
+    switch(code){
+        case 13:
+        descript = "forbidden set";
+        break;
+        case 42:
+        descript = "all ok";
+        break;
+        case 63:
+        descript = "doubtful set";
+        break;
+        case 99:
+        descript = "lights off";
+        break;
+        default:
+        descript = "unknown code";
+        break;
+    }
+    sprintf(msg, "%s code[%u]", descript, code);
+
+    mqtt->do_publish("diagnostics", msg);
+}
+
 /* Реализация метода  DCode */
 static nk_err_t DCode(struct IDiagComm *self,
                         const
@@ -195,6 +228,7 @@ static nk_err_t DCode(struct IDiagComm *self,
     
     //std::cerr << app::AppTag << req->code << std::endl;
     std::cerr << app::AppTag << "got DCode = " << req->code << std::endl;
+    dcode_to_mqtt(req->code);
     return NK_EOK;
 }
 

@@ -222,8 +222,20 @@ static nk_err_t CSMode(struct ICSMode *self,
         /* автоматическое управление */
         current_state.entered = false;
         current_state.mode = TL_MODE_TO_GREEN1_1;
+
+        // Проверить не нулёв ли times
+        bool t_zeroes = true;
         for (int i =0; i<(times_len/2-1); i++){
-            state_times[i] = times[i];
+            if (times[i]>0){
+                t_zeroes = false;
+                break;
+            }
+        }
+
+        if (!t_zeroes){
+            for (int i =0; i<(times_len/2-1); i++){
+                state_times[i] = times[i];
+            }
         }
         break;
         case 3:
