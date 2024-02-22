@@ -22,6 +22,7 @@ use EDL traffic_light.ControlSystem
 use EDL traffic_light.LightsGPIO
 use EDL traffic_light.Diagnostics
 use EDL traffic_light.Communication
+use EDL traffic_light.Logger
 
 /* Platform-specific EDL descriptions. */
 use EDL kl.drivers.SDCard
@@ -75,6 +76,7 @@ execute src = Einit
     match dst = traffic_light.LightsGPIO {grant()}
     match dst = traffic_light.Diagnostics {grant()}
     match dst = traffic_light.Communication {grant()}
+    match dst = traffic_light.Logger {grant()}
 }
 
 /* ядро могут запрашивать */
@@ -100,6 +102,7 @@ request  dst = kl.core.Core
     match src = traffic_light.LightsGPIO {grant()}
     match src = traffic_light.Diagnostics {grant()}
     match src = traffic_light.Communication {grant()}
+    match src = traffic_light.Logger {grant()}
 }
 
 /* ядро может отвечать */
@@ -127,6 +130,7 @@ response src = kl.core.Core
     match dst = traffic_light.LightsGPIO {grant()}
     match dst = traffic_light.Diagnostics {grant()}
     match dst = traffic_light.Communication {grant()}
+    match dst = traffic_light.Logger {grant()}
 }
 
 /* Файловые системы разговаривают с дровами */
@@ -169,24 +173,28 @@ request dst = kl.VfsRamFs
 {
     match src = kl.rump.Dhcpcd {grant()}
     match src = traffic_light.Communication {grant()}
+    match src = traffic_light.Logger {grant()}
 }
 
 response src = kl.VfsRamFs
 {
     match dst = kl.rump.Dhcpcd {grant()}
     match dst = traffic_light.Communication {grant()}
+    match dst = traffic_light.Logger {grant()}
 }
 /* Rpi */
 request dst = kl.VfsSdCardFs
 {
     match src = kl.rump.Dhcpcd {grant()}
     match src = traffic_light.Communication {grant()}
+    match src = traffic_light.Logger {grant()}
 }
 
 response src = kl.VfsSdCardFs
 {
     match dst = kl.rump.Dhcpcd {grant()}
     match dst = traffic_light.Communication {grant()}
+    match dst = traffic_light.Logger {grant()}
 }
 
 /* Специальные разрешения по компонентам и методам сущностей */
@@ -206,6 +214,23 @@ response
     src=traffic_light.LightsGPIO
     endpoint=lightsGpio.mode 
     method=FMode {
+        grant()
+}
+
+request src=traffic_light.ControlSystem 
+
+    /* запрашивает управление светодиодами */
+    dst=traffic_light.Logger 
+    interface=traffic_light.Write
+    method=WriteInLog {
+        grant()
+}
+
+response  
+    dst=traffic_light.ControlSystem 
+    src=traffic_light.Logger
+    interface=traffic_light.Write
+    method=WriteInLog {
         grant()
 }
 

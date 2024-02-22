@@ -6,6 +6,9 @@
 #include <unistd.h>
 #include <pthread.h>
 
+#include <rtl/string.h>
+#include <rtl/stdio.h>
+
 #define NK_USE_UNQUALIFIED_NAMES
 
 /* Files required for transport initialization. */
@@ -16,6 +19,7 @@
 #include <traffic_light/ControlSystem.edl.h>
 #include <traffic_light/IMode.idl.h>
 #include <traffic_light/ICSMode.idl.h>
+#include <traffic_light/Write.idl.h>
 
 #include <assert.h>
 
@@ -87,6 +91,158 @@ typedef struct{
 /* Текущее состояние */
 static cs_state current_state = {.mode = TL_MODE_UNREG, .timer_secs = 0, .entered=false};
 
+/* IPC с Logger */
+typedef struct {
+    NkKosTransport transport;
+    Handle handle;
+    nk_iid_t riid;
+    struct Write_proxy proxy;
+    Write_WriteInLog_req req;
+    Write_WriteInLog_res res;
+    struct nk_arena reqArena;
+    char reqBuffer[Write_WriteInLog_req_arena_size];
+    struct nk_arena resArena;
+    char resBuffer[Write_WriteInLog_res_arena_size];
+} Logger_TransportDescriptor;
+
+static Logger_TransportDescriptor Logger_td;
+
+int logger_transport_init(Logger_TransportDescriptor *td){
+    td->handle = ServiceLocatorConnect("logger_connection");
+    if (td->handle == INVALID_HANDLE)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t establish static IPC connection!\n",
+            EntityName);
+
+        return EXIT_FAILURE;
+    }
+
+    /* Initialize IPC-transport for connection with Logger program. */
+    NkKosTransport_Init(&td->transport, td->handle, NK_NULL, 0);
+
+    /**
+     * Get runtime implementation ID (RIID) of interface
+     * secure_logger.Logger.write.
+     */
+    td->riid = ServiceLocatorGetRiid(
+                                td->handle, "traffic_light.Logger.write");
+    if (td->riid == INVALID_RIID)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t get runtime implementation ID (RIID) of "
+            "interface secure_logger.Logger.write!\n",
+            EntityName);
+
+        return EXIT_FAILURE;
+    }
+
+    /**
+     * Initialize proxy-object. Every method of proxy-object will be
+     * realized as request to server.
+     */
+    Write_proxy_init(&td->proxy, &td->transport.base, td->riid);
+
+
+    struct nk_arena reqArena = NK_ARENA_INITIALIZER(
+                                td->reqBuffer, td->reqBuffer + sizeof(td->reqBuffer));
+
+    td->reqArena = reqArena;
+    /**
+     * Application program must not be able to read from log. Code below
+     * will not get handle of "reader_connection".
+     */
+    if (ServiceLocatorConnect("logger_connection") == INVALID_HANDLE)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Expected behavior: can not open connection with Reader\n",
+            EntityName);
+    }
+    else
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: something goes wrong! Somebody could get access"
+            " to read from log file!\n",
+            EntityName);
+    }
+    return 0;
+}
+
+#define SEND_MESSAGE_COUNT 1
+static void WriteInLog(Logger_TransportDescriptor *td, const char *logMessage)
+{
+    int logMessageLength = 0;
+
+    nk_arena_reset(&td->reqArena);
+
+    nk_ptr_t *message = nk_arena_alloc(nk_ptr_t,
+                                       &td->reqArena,
+                                       &(td->req.message[0]),
+                                       SEND_MESSAGE_COUNT);
+    if (message == RTL_NULL)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t allocate memory in arena!\n",
+            EntityName);
+
+        return;
+    }
+
+    // logMessageLength = rtl_snprintf(
+    //                         logMessage,
+    //                         Write_WriteInLog_req_message_elem_size,
+    //                         "Log message %u",
+    //                         messageCounter);
+    // if (logMessageLength < 0)
+    // {
+    //     fprintf(
+    //         stderr,
+    //         "[%s]: Error: length of message is negative number!\n",
+    //         EntityName);
+
+    //     return;
+    // }
+
+    logMessageLength = rtl_strlen(logMessage);
+
+    nk_char_t *str = nk_arena_alloc(
+        nk_char_t,
+        &td->reqArena,
+        &message[0],
+        (nk_size_t) (logMessageLength + 1));
+    if (str == RTL_NULL)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t allocate memory in arena!\n",
+            EntityName);
+
+        return;
+    }
+
+    rtl_strncpy(str, logMessage, (rtl_size_t) (logMessageLength + 1));
+
+    if (Write_WriteInLog(
+                &td->proxy.base,
+                &td->req,
+                &td->reqArena,
+                &td->res,
+                &td->resArena) != NK_EOK)
+    {
+        fprintf(
+            stderr,
+            "[%s]: Error: can`t send message to Logger entity!\n",
+            EntityName);
+    }
+
+    fprintf(stderr, "[%s]: write in log : %s\n", EntityName, logMessage);
+}
+
 /* структура - описатель  IPC с LightsGPIO */
 typedef struct {
     struct IMode_proxy *proxy;
@@ -101,6 +257,7 @@ typedef struct {
     .req = reqIn,                           \
     .res = resIn,                           \
 }
+
 
 /* Обертка IPC к  LightsGPIO */
 int LightsGPIO_send(TransportDescriptor *td, uint32_t mode){
@@ -217,6 +374,8 @@ static nk_err_t CSMode(struct ICSMode *self,
         current_state.mode = TL_MODE_MANUAL;
         state_times[0] = 0xFFFF;
         IMode_manualSet = manualSet;
+
+        WriteInLog(&Logger_td, "Enter mode \"manual\"");
         break;
         case 2:
         /* автоматическое управление */
@@ -237,12 +396,14 @@ static nk_err_t CSMode(struct ICSMode *self,
                 state_times[i] = times[i];
             }
         }
+        WriteInLog(&Logger_td, "Enter mode \"auto\"");
         break;
         case 3:
         /* нерегулируемы режим */
         current_state.entered = false;
         current_state.mode = TL_MODE_UNREG;
         state_times[1] = 0xFFFF;
+        WriteInLog(&Logger_td, "Enter mode \"unregulated\"");
         break;
         default:
         break;
@@ -372,6 +533,9 @@ int main()
     /* Инициализация входящего соединения от Communication */
     CCSMode_TransportDescriptor CCSMode_td;
     cs_connection_init(&CCSMode_td);
+
+    /* Инициализация IPC с Logger */
+    logger_transport_init(&Logger_td);
 
 
     /*  поскольку обслуга IPC локается вынесем машину состояний в нить*/

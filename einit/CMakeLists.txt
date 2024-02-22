@@ -8,6 +8,7 @@ project_header_default ("STANDARD_GNU_11:YES" "STRICT_WARNINGS:NO")
 
 # Define the ENTITIES variable with a list of entities.
 set (ENTITIES 
+        Logger
         Communication
         Diagnostics 
         ControlSystem 

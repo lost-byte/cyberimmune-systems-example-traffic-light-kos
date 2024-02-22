@@ -20,6 +20,7 @@ nk_build_idl_files (traffic_light_idl_files
                     "resources/IDiagnostics.idl"
                     "resources/ICSMode.idl"
                     "resources/IDiagComm.idl"
+                    "resources/Write.idl"
                     )
 
 nk_build_cdl_files (traffic_light_cdl_files 
@@ -50,6 +51,11 @@ nk_build_edl_files (traffic_light_communication_edl_files
                     CDL_TARGET traffic_light_cdl_files
                     NK_MODULE "traffic_light" 
                     EDL "resources/Communication.edl")
+
+nk_build_edl_files (traffic_light_communication_edl_files 
+                    CDL_TARGET traffic_light_cdl_files
+                    NK_MODULE "traffic_light" 
+                    EDL "resources/Logger.edl")
 
 # Add a package with the mosquitto component.
 find_package (mosquitto REQUIRED COMPONENTS CXX_LIB)
@@ -98,6 +104,7 @@ set(VULN_COMPILER_FLAGS "\
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${VULN_COMPILER_FLAGS}")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${VULN_COMPILER_FLAGS}")
 
+add_subdirectory (logger)
 add_subdirectory (communication)
 add_subdirectory (diagnostics)
 add_subdirectory (control_system)
