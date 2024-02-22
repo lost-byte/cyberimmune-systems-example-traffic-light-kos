@@ -194,7 +194,7 @@ static nk_err_t DCode(struct IDiagComm *self,
 {
     
     //std::cerr << app::AppTag << req->code << std::endl;
-    std::cerr << app::AppTag << "got diag" << std::endl;
+    std::cerr << app::AppTag << "got DCode = " << req->code << std::endl;
     return NK_EOK;
 }
 

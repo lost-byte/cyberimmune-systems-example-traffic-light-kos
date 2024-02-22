@@ -77,6 +77,7 @@
         "span": "cpp",
         "controlsystem.edl.h": "c",
         "idiag2comm.idl.h": "c",
-        "idiagcomm.idl.h": "c"
+        "idiagcomm.idl.h": "c",
+        "stdbool.h": "c"
     }
 }

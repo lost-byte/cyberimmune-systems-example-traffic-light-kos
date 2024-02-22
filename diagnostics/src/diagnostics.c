@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 /* Files required for transport initialization. */
 #include <coresrv/nk/transport-kos.h>
@@ -28,8 +29,8 @@ typedef struct{
     nk_iid_t riid;
     Handle handle;
     IDiagComm_DCode_req req;
-    char req_buffer[IDiagnostics_DMessage_req_arena_size];
-    struct nk_arena req_arena;
+    //char req_buffer[IDiagnostics_DMessage_req_arena_size];
+    //struct nk_arena req_arena;
     IDiagComm_DCode_res res;
     //char res_buffer[IDiagnostics_DMessage_res_arena_size];
     //struct nk_arena res_arena;
@@ -47,11 +48,11 @@ void communication_connection_init(CDiagComm_TransportDescriptor *td){
     IDiagComm_proxy_init(&td->proxy,
                                 &td->transport.base,
                                 td->riid);
-    struct nk_arena arena = NK_ARENA_INITIALIZER(
-                                td->req_buffer,
-                                td->req_buffer + 
-                                sizeof(td->req_buffer));
-    td->req_arena = arena;
+    // struct nk_arena arena = NK_ARENA_INITIALIZER(
+    //                             td->req_buffer,
+    //                             td->req_buffer + 
+    //                             sizeof(td->req_buffer));
+    // td->req_arena = arena;
 }
 
 void communication_connection_send(CDiagComm_TransportDescriptor *td, 
@@ -89,16 +90,17 @@ typedef struct {
 } CDmessage_TransportDescriptor;
 
 /* Implementation of Dmessage method. */
-static nk_err_t Dmesage(struct traffic_light_IDiagnostics *self,
+static uint32_t code;
+static nk_err_t Dmesage(struct IDiagnostics *self,
                         const
-                        struct traffic_light_IDiagnostics_DMessage_req *req,
+                        struct IDiagnostics_DMessage_req *req,
                         const
                         struct nk_arena *req_arena,
-                        struct traffic_light_IDiagnostics_DMessage_res *res,
+                        struct IDiagnostics_DMessage_res *res,
                         struct nk_arena *res_arena)
 {
     
-    uint32_t code=req->code;
+    code=req->code;
 
     nk_uint32_t msg_len = 0;    
     nk_ptr_t *msg = nk_arena_get(
@@ -194,13 +196,16 @@ int main(int argc, const char *argv[])
 
     diagnostics_connection_init(&CDmessage_td);
 
-    
+    communication_connection_init(&CDiagComm_td);
 
     /* Рабочий цикл */
     while(true){
         diagnostics_connection_loop(&CDmessage_td);
-        communication_connection_send(&CDiagComm_td, 12);
-        
+
+        //fprintf(stderr, "[%s] send to Comm...\n", EntityName);
+        communication_connection_send(&CDiagComm_td, code);
+        //fprintf(stderr, "[%s] ...done\n", EntityName);
+        sleep(1);
     };
 
     return EXIT_SUCCESS;
