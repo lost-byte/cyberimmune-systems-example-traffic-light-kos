@@ -55,7 +55,7 @@ nk_build_edl_files (traffic_light_communication_edl_files
                     NK_MODULE "traffic_light" 
                     EDL "resources/Communication.edl")
 
-nk_build_edl_files (traffic_light_communication_edl_files 
+nk_build_edl_files (traffic_light_logger_edl_files 
                     CDL_TARGET traffic_light_cdl_files
                     NK_MODULE "traffic_light" 
                     EDL "resources/Logger.edl")
