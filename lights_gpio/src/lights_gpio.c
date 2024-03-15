@@ -145,11 +145,9 @@ struct check_lights_result check_lights(){
 }
 
 // Инициализатор GPIO
+/*
 int bsp_gpio_init(){
-    /**
-     * Initialize the board support package (BSP) driver and set configuration
-     * for GPIO pins. It is required for stdout by UART.
-     */
+   
     Retcode rc = rcFail;
     GpioHandle handle = GPIO_INVALID_HANDLE;
 
@@ -172,7 +170,7 @@ int bsp_gpio_init(){
         }
     }
 
-    /* Initialize the GPIO. */
+    // Initialize the GPIO. 
     if (rcOk == rc)
     {
         rc = GpioInit();
@@ -183,7 +181,7 @@ int bsp_gpio_init(){
         }
     }
 
-    /* Initialize and setup HW_MODULE_NAME port. */
+    // Initialize and setup HW_MODULE_NAME port. 
     if (rcOk == rc)
     {
         rc = GpioOpenPort(HW_MODULE_NAME, &handle);
@@ -219,8 +217,10 @@ int bsp_gpio_init(){
 
     return rc;
 }
+*/
 
-/* реальный имитатор световора */
+/* реальный имитатор светофора */
+/*
 void lights_gpio_set(){
     Retcode rc = rcFail;
     GpioHandle handle = GPIO_INVALID_HANDLE;
@@ -244,6 +244,7 @@ void lights_gpio_set(){
         }
     }
 }
+*/
 
 /* Консольный имитатор светофора */
 void lights_stub(){
@@ -471,7 +472,7 @@ int main(void)
         /* Типа имитация светофора */
         lights_stub();
 
-        lights_gpio_set();
+        //lights_gpio_set();
 
         /* Типа проверка состояния */
         struct check_lights_result clr = check_lights();
