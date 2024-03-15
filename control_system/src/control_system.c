@@ -163,11 +163,13 @@ int logger_transport_init(Logger_TransportDescriptor *td){
     }
     else
     {
+        /*
         fprintf(
             stderr,
             "[%s]: Error: something goes wrong! Somebody could get access"
             " to read from log file!\n",
             EntityName);
+            */
     }
     return 0;
 }

@@ -16,12 +16,25 @@
 #include <traffic_light/LightsGPIO.edl.h>
 #include <traffic_light/IDiagnostics.idl.h>
 
+/* BSP GPIO */
+#include <bsp/bsp.h>
+#include <gpio/gpio.h>
+
+
 #include <assert.h>
 
 #define CLR_RED      "\x1b[91m"
 #define CLR_YELLOW   "\x1b[93m"
 #define CLR_GREEN    "\x1b[92m"
 #define CLR_RESET    "\x1b[0m"
+
+// GPIO defines
+#define HW_MODULE_NAME  "gpio0"
+#define HW_MODULE_CFG   "raspberry_pi4b.default"
+
+// Назначение GPIO в порядке D1:R_Y_G_BLINK, D2:R_Y_G_BLINK
+#define GPIOS_CNT 8
+const rtl_uint32_t gpios[GPIOS_CNT] = {0,1,7,8,10,11,25,8};
 
 
 static const char EntityName[] = "LightsGPIO";
@@ -129,6 +142,107 @@ struct check_lights_result check_lights(){
     }
 
     return clr;
+}
+
+// Инициализатор GPIO
+int bsp_gpio_init(){
+    /**
+     * Initialize the board support package (BSP) driver and set configuration
+     * for GPIO pins. It is required for stdout by UART.
+     */
+    Retcode rc = rcFail;
+    GpioHandle handle = GPIO_INVALID_HANDLE;
+
+    rc = BspInit(NULL);
+    if (rc != BSP_EOK)
+    {
+        fprintf(stderr,
+                "[%s] Failed to initialize BSP, error code: %d.\n", EntityName,
+                RC_GET_CODE(rc));
+    }
+
+    if (rcOk == rc)
+    {
+        rc = BspSetConfig(HW_MODULE_NAME, HW_MODULE_CFG);
+        if (rcOk != rc)
+        {
+            fprintf(stderr, "[%s] Failed to set mux configuration for %s module, "
+                    "error code: %d.\n",EntityName, HW_MODULE_NAME,
+                    RC_GET_CODE(rc));
+        }
+    }
+
+    /* Initialize the GPIO. */
+    if (rcOk == rc)
+    {
+        rc = GpioInit();
+        if (rcOk != rc)
+        {
+            fprintf(stderr, "[%s] GpioInit failed, error code: %d.\n",
+                    EntityName,RC_GET_CODE(rc));
+        }
+    }
+
+    /* Initialize and setup HW_MODULE_NAME port. */
+    if (rcOk == rc)
+    {
+        rc = GpioOpenPort(HW_MODULE_NAME, &handle);
+        if (rcOk != rc)
+        {
+            fprintf(stderr,
+                    "[%s] GpioOpenPort port %s failed, error code: %d.\n",
+                    EntityName, HW_MODULE_NAME, RC_GET_CODE(rc));
+        }
+        else if (GPIO_INVALID_HANDLE == handle)
+        {
+            fprintf(stderr, "[%s] GPIO module %s handle is invalid.\n", EntityName,
+                    HW_MODULE_NAME);
+            rc = rcFail;
+        }
+    }
+
+    if (rcOk == rc)
+    {
+        for (rtl_uint32_t pin = 0; pin < GPIOS_CNT; pin++)
+        {
+            rtl_uint32_t pinNum = gpios[pin];
+            rc = GpioSetMode(handle, pinNum, GPIO_DIR_OUT);
+            if (rcOk != rc)
+            {
+                fprintf(stderr, "[%s] GpioSetMode for module %s pin %u failed, "
+                        "error code: %d.\n", EntityName, HW_MODULE_NAME, pinNum,
+                        RC_GET_CODE(rc));
+                break;
+            }
+        }
+    }
+
+    return rc;
+}
+
+/* реальный имитатор световора */
+void lights_gpio_set(){
+    Retcode rc = rcFail;
+    GpioHandle handle = GPIO_INVALID_HANDLE;
+
+    uint8_t dir1 = lights_bitfield&0xF;
+    uint8_t dir2 = ((lights_bitfield&0xF00)>>8);
+
+    for (int i=0; i<3; i++){
+
+        rtl_uint32_t pinNum = gpios[i];
+        uint32_t pinState = (dir1&(1<<i))?0:1;
+
+        rc = GpioOut(handle, pinNum, pinState);
+        if (rcOk != rc)
+        {
+            
+            fprintf(stderr, "[%s] GpioOut 1 for module %s pin %u failed, "
+                    "error code: %d.\n", HW_MODULE_NAME, pinNum,
+                    RC_GET_CODE(rc));
+            break;
+        }
+    }
 }
 
 /* Консольный имитатор светофора */
@@ -339,12 +453,14 @@ int main(void)
     CMode_TransportDescriptor cs_td;
     lights_gpio_connection_init(&cs_td);
 
-    fprintf(stderr, "[%s] API transport inited\n", EntityName);
-
-
     CDMmessage_TransportDescriptor cdm_td;
     diagnostics_connection_init(&cdm_td);
 
+    fprintf(stderr, "[%s] API transport inited\n", EntityName);
+
+
+    //bool gpio_ready = (!bsp_gpio_init());
+    //fprintf(stderr, "[%s] GPIO init %s\n", EntityName, gpio_ready?"failed":"done");
 
     /* Dispatch loop implementation. */
     do
@@ -354,6 +470,8 @@ int main(void)
 
         /* Типа имитация светофора */
         lights_stub();
+
+        lights_gpio_set();
 
         /* Типа проверка состояния */
         struct check_lights_result clr = check_lights();

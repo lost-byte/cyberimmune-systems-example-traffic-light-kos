@@ -9,6 +9,9 @@ initialize_platform ()
 # Add functions for installing artefacts.
 include (platform/install)
 
+# Platform definition
+include (platform/options)
+
 # Tools for using NK parser.
 include (platform/nk)
 
@@ -73,6 +76,17 @@ find_package (precompiled_vfs REQUIRED)
 include_directories (${precompiled_vfs_INCLUDE})
 
 find_package(nlohmann_json 3.2.0 REQUIRED)
+
+if ("${CMAKE_SYSTEM_PROCESSOR}" MATCHES "arm|aarch64")
+    # This command will find the BSP package components
+    # (BSP_HW_ENTITY, BSP_QEMU_ENTITY and BSP_CLIENT_LIB)
+    find_package (bsp REQUIRED)
+    include_directories (${bsp_INCLUDE})
+endif ()
+
+# Add a package with the GPIO client library.
+find_package (gpio REQUIRED COMPONENTS CLIENT_LIB ENTITY)
+include_directories (${gpio_INCLUDE})
 
 # Choose the storage devices for the configuration files.
 # If none of the options are selected, the ramfs device is used.
